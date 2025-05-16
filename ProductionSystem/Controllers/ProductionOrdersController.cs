@@ -74,7 +74,7 @@ namespace ProductionSystem.Controllers
             if (ModelState.IsValid)
             {
                 order.Status = "Created";
-                order.CreatedAt = DateTime.UtcNow;
+                order.CreatedAt = ProductionContext.GetLocalNow();
 
                 _context.Add(order);
                 await _context.SaveChangesAsync();
@@ -121,7 +121,8 @@ namespace ProductionSystem.Controllers
                     BatchNumber = i,
                     Quantity = batchQuantity,
                     Status = "Created",
-                    CreatedAt = DateTime.UtcNow
+                    // ИСПРАВЛЕНИЕ: убираем Kind из DateTime
+                    CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
                 };
 
                 _context.SubBatches.Add(subBatch);
@@ -133,6 +134,7 @@ namespace ProductionSystem.Controllers
                 await CreateRouteStages(subBatch, detail);
             }
         }
+
 
         private async Task CreateRouteStages(SubBatch subBatch, Detail detail)
         {
@@ -150,7 +152,8 @@ namespace ProductionSystem.Controllers
                     Order = operation.Order,
                     PlannedTime = operation.TimePerPiece * subBatch.Quantity,
                     Quantity = subBatch.Quantity,
-                    Status = "Pending"
+                    Status = "Pending",
+                    CreatedAt = ProductionContext.GetLocalNow()
                 };
 
                 _context.RouteStages.Add(routeStage);
@@ -166,24 +169,45 @@ namespace ProductionSystem.Controllers
             if (order != null && order.Status == "Created")
             {
                 order.Status = "InProgress";
-                order.StartedAt = DateTime.UtcNow;
+                // ИСПРАВЛЕНИЕ: убираем Kind из DateTime
+                order.StartedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+
                 await _context.SaveChangesAsync();
+                TempData["Message"] = "Задание успешно запущено";
             }
             return RedirectToAction(nameof(Details), new { id });
         }
 
+
         [HttpPost]
         public async Task<IActionResult> CompleteOrder(int id)
         {
-            var order = await _context.ProductionOrders.FindAsync(id);
-            if (order != null && order.Status == "InProgress")
+            try
             {
-                order.Status = "Completed";
-                order.CompletedAt = DateTime.UtcNow;
-                await _context.SaveChangesAsync();
+                var order = await _context.ProductionOrders.FindAsync(id);
+                if (order != null && order.Status == "InProgress")
+                {
+                    order.Status = "Completed";
+                    // ИСПРАВЛЕНИЕ: убираем Kind из DateTime
+                    order.CompletedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+
+                    await _context.SaveChangesAsync();
+                    TempData["Message"] = "Задание успешно завершено";
+                }
+                else
+                {
+                    TempData["Error"] = "Задание не может быть завершено";
+                }
             }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Ошибка при завершении задания: {ex.Message}";
+                Console.WriteLine($"Error completing order {id}: {ex}");
+            }
+
             return RedirectToAction(nameof(Details), new { id });
         }
+
 
         public async Task<IActionResult> Delete(int? id)
         {

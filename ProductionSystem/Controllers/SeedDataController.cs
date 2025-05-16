@@ -206,7 +206,7 @@ namespace ProductionSystem.Controllers
                                     ToDetailId = details[j].Id,
                                     ChangeoverTime = Math.Round(changeoverTime, 3),
                                     Description = $"Переналадка {machine.Name} с {details[i].Name} на {details[j].Name}",
-                                    CreatedAt = DateTime.UtcNow
+                                    CreatedAt = ProductionContext.GetLocalNow()
                                 });
                             }
                         }

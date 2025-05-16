@@ -2,16 +2,19 @@
 using Microsoft.EntityFrameworkCore;
 using ProductionSystem.Data;
 using ProductionSystem.Models;
+using ProductionSystem.Services;
 
 namespace ProductionSystem.Controllers
 {
     public class GanttController : Controller
     {
         private readonly ProductionContext _context;
+        private readonly IStageAutomationService _stageAutomationService;
 
-        public GanttController(ProductionContext context)
+        public GanttController(ProductionContext context, IStageAutomationService stageAutomationService)
         {
             _context = context;
+            _stageAutomationService = stageAutomationService;
         }
 
         public async Task<IActionResult> Index(int? orderId, int? machineId)
@@ -30,112 +33,271 @@ namespace ProductionSystem.Controllers
             return View();
         }
 
-        public async Task<IActionResult> MachineSchedule()
-        {
-            ViewBag.Machines = await _context.Machines
-                .Select(m => new { m.Id, m.Name })
-                .ToListAsync();
-
-            return View();
-        }
-
         [HttpGet]
         public async Task<IActionResult> GetGanttData(int? orderId, int? machineId, DateTime? startDate, DateTime? endDate)
         {
-            var query = _context.RouteStages
+            try
+            {
+                var query = _context.RouteStages
+                    .Include(rs => rs.SubBatch)
+                    .ThenInclude(sb => sb.ProductionOrder)
+                    .ThenInclude(po => po.Detail)
+                    .Include(rs => rs.Machine)
+                    .Include(rs => rs.Operation)
+                    .Include(rs => rs.StageExecutions)
+                    .Where(rs => rs.Status != "Pending");
+
+                if (orderId.HasValue)
+                {
+                    query = query.Where(rs => rs.SubBatch.ProductionOrderId == orderId.Value);
+                }
+
+                if (machineId.HasValue)
+                {
+                    query = query.Where(rs => rs.MachineId == machineId.Value);
+                }
+
+                var stages = await query.OrderBy(rs => rs.SubBatchId)
+                    .ThenBy(rs => rs.Order)
+                    .ToListAsync();
+
+                // Группируем этапы по подпартиям для правильного расчета зависимостей
+                var stagesBySubBatch = stages.GroupBy(s => s.SubBatchId).ToList();
+
+                var ganttData = new List<object>();
+
+                foreach (var subBatchGroup in stagesBySubBatch)
+                {
+                    var orderedStages = subBatchGroup.OrderBy(s => s.Order).ToList();
+
+                    for (int i = 0; i < orderedStages.Count; i++)
+                    {
+                        var stage = orderedStages[i];
+
+                        // Рассчитываем даты с учетом реальной последовательности
+                        var startDate_calc = GetStageStartDate(stage, orderedStages, i);
+                        var endDate_calc = GetStageEndDate(stage, startDate_calc);
+
+                        // Определяем зависимости только внутри одной подпартии
+                        var dependencies = "";
+                        if (i > 0)
+                        {
+                            var previousStage = orderedStages[i - 1];
+                            dependencies = $"task_{previousStage.Id}";
+                        }
+
+                        ganttData.Add(new
+                        {
+                            taskId = $"task_{stage.Id}",
+                            taskName = $"{stage.SubBatch.ProductionOrder.Detail.Name} - П{stage.SubBatch.BatchNumber} - {stage.Name}",
+                            resource = stage.Machine?.Name ?? "Не назначен",
+                            start = startDate_calc,
+                            end = endDate_calc,
+                            duration = (int)(stage.PlannedTime * 24 * 60 * 60 * 1000),
+                            percentComplete = GetStageProgress(stage),
+                            dependencies = dependencies,
+                            status = stage.Status,
+                            stageType = stage.StageType,
+                            actualStart = GetActualStartDate(stage),
+                            actualEnd = GetActualEndDate(stage),
+                            subBatchId = stage.SubBatchId,
+                            orderId = stage.SubBatch.ProductionOrderId,
+                            stageId = stage.Id
+                        });
+                    }
+                }
+
+                return Json(ganttData);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка в GetGanttData: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                return StatusCode(500, new { error = "Ошибка загрузки данных диаграммы Ганта", details = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> ReleaseMachine(int machineId, int urgentStageId, string reason)
+        {
+            try
+            {
+                var success = await _stageAutomationService.ReleaseMachine(machineId, urgentStageId, reason);
+
+                if (success)
+                {
+                    return Json(new { success = true, message = "Станок освобожден для срочной задачи" });
+                }
+                else
+                {
+                    return Json(new { success = false, message = "Не удалось освободить станок" });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> AddStageToQueue(int stageId)
+        {
+            try
+            {
+                var success = await _stageAutomationService.AddStageToQueue(stageId);
+
+                if (success)
+                {
+                    return Json(new { success = true, message = "Этап добавлен в очередь" });
+                }
+                else
+                {
+                    return Json(new { success = false, message = "Не удалось добавить этап в очередь" });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RemoveStageFromQueue(int stageId)
+        {
+            try
+            {
+                var success = await _stageAutomationService.RemoveStageFromQueue(stageId);
+
+                if (success)
+                {
+                    return Json(new { success = true, message = "Этап удален из очереди" });
+                }
+                else
+                {
+                    return Json(new { success = false, message = "Не удалось удалить этап из очереди" });
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetStageInfo(int stageId)
+        {
+            var stage = await _context.RouteStages
                 .Include(rs => rs.SubBatch)
                 .ThenInclude(sb => sb.ProductionOrder)
                 .ThenInclude(po => po.Detail)
                 .Include(rs => rs.Machine)
                 .Include(rs => rs.Operation)
                 .Include(rs => rs.StageExecutions)
-                .Where(rs => rs.Status != "Pending");
+                .FirstOrDefaultAsync(rs => rs.Id == stageId);
 
-            if (orderId.HasValue)
+            if (stage == null)
+                return NotFound();
+
+            var estimatedStart = stage.Status == "Waiting"
+                ? await _stageAutomationService.GetEstimatedStartTime(stageId)
+                : null;
+
+            var stageInfo = new
             {
-                query = query.Where(rs => rs.SubBatch.ProductionOrderId == orderId.Value);
-            }
+                id = stage.Id,
+                name = stage.Name,
+                status = stage.Status,
+                stageType = stage.StageType,
+                machineId = stage.MachineId,
+                machineName = stage.Machine?.Name,
+                detailName = stage.SubBatch.ProductionOrder.Detail.Name,
+                orderNumber = stage.SubBatch.ProductionOrder.Number,
+                plannedTime = stage.PlannedTime,
+                estimatedStart = estimatedStart,
+                canReleaseMachine = stage.MachineId.HasValue &&
+                                  stage.StageExecutions.Any(se => se.Status == "Started" || se.Status == "Paused"),
+                canAddToQueue = stage.Status == "Ready",
+                canRemoveFromQueue = stage.Status == "Waiting"
+            };
 
-            if (machineId.HasValue)
-            {
-                query = query.Where(rs => rs.MachineId == machineId.Value);
-            }
+            return Json(stageInfo);
+        }
 
-            var stages = await query.OrderBy(rs => rs.SubBatchId)
+        [HttpGet]
+        public async Task<IActionResult> GetMachineQueue(int machineId)
+        {
+            var machine = await _context.Machines
+                .Include(m => m.MachineType)
+                .FirstOrDefaultAsync(m => m.Id == machineId);
+
+            if (machine == null)
+                return NotFound();
+
+            // Получаем все этапы в очереди для этого типа станка
+            var queuedStages = await _context.RouteStages
+                .Include(rs => rs.SubBatch)
+                .ThenInclude(sb => sb.ProductionOrder)
+                .ThenInclude(po => po.Detail)
+                .Include(rs => rs.Operation)
+                .Where(rs => rs.Status == "Waiting" &&
+                           rs.Operation != null &&
+                           rs.Operation.MachineTypeId == machine.MachineTypeId)
+                .OrderBy(rs => rs.SubBatch.ProductionOrder.CreatedAt)
                 .ThenBy(rs => rs.Order)
                 .ToListAsync();
 
-            var ganttData = stages.Select(stage => new
+            var queueInfo = queuedStages.Select(async stage => new
             {
-                taskId = $"task_{stage.Id}",
-                taskName = $"{stage.SubBatch.ProductionOrder.Detail.Name} - П{stage.SubBatch.BatchNumber} - {stage.Name}",
-                resource = stage.Machine?.Name ?? "Не назначен",
-                start = GetStageStartDate(stage),
-                end = GetStageEndDate(stage),
-                duration = (int)(stage.PlannedTime * 24 * 60 * 60 * 1000), // миллисекунды
-                percentComplete = GetStageProgress(stage),
-                dependencies = GetStageDependencies(stage),
-                status = stage.Status,
-                stageType = stage.StageType,
-                actualStart = GetActualStartDate(stage),
-                actualEnd = GetActualEndDate(stage),
-                subBatchId = stage.SubBatchId,
-                orderId = stage.SubBatch.ProductionOrderId,
-                stageId = stage.Id
-            }).ToList();
+                id = stage.Id,
+                name = stage.Name,
+                detailName = stage.SubBatch.ProductionOrder.Detail.Name,
+                orderNumber = stage.SubBatch.ProductionOrder.Number,
+                estimatedStart = await _stageAutomationService.GetEstimatedStartTime(stage.Id)
+            }).Select(t => t.Result).ToList();
 
-            return Json(ganttData);
+            return Json(new { machine = machine.Name, queue = queueInfo });
         }
 
-        private DateTime? GetStageStartDate(RouteStage stage)
+        // Вспомогательные методы
+        private DateTime GetStageStartDate(RouteStage stage, List<RouteStage> orderedStages, int currentIndex)
         {
-            // Если этап запущен, используем фактическую дату
+            // Если этап уже запущен, используем фактическое время
             var execution = stage.StageExecutions.FirstOrDefault();
             if (execution?.StartedAt != null)
-                return execution.StartedAt;
+                return execution.StartedAt.Value;
 
             // Если есть плановая дата
             if (stage.PlannedStartDate != null)
-                return stage.PlannedStartDate;
+                return stage.PlannedStartDate.Value;
 
-            // Иначе вычисляем на основе предыдущих этапов
-            return CalculateStageStartDate(stage);
-        }
-
-        private DateTime? GetStageEndDate(RouteStage stage)
-        {
-            var execution = stage.StageExecutions.FirstOrDefault();
-            if (execution?.CompletedAt != null)
-                return execution.CompletedAt;
-
-            if (stage.PlannedEndDate != null)
-                return stage.PlannedEndDate;
-
-            var startDate = GetStageStartDate(stage);
-            if (startDate.HasValue)
-                return startDate.Value.AddHours((double)stage.PlannedTime);
-
-            return null;
-        }
-
-        private DateTime? CalculateStageStartDate(RouteStage stage)
-        {
-            // Находим предыдущий этап
-            var previousStage = _context.RouteStages
-                .Where(rs => rs.SubBatchId == stage.SubBatchId && rs.Order < stage.Order)
-                .OrderByDescending(rs => rs.Order)
-                .FirstOrDefault();
-
-            if (previousStage != null)
+            // Если это первый этап в подпартии
+            if (currentIndex == 0)
             {
-                var prevEndDate = GetStageEndDate(previousStage);
-                if (prevEndDate.HasValue)
-                    return prevEndDate.Value;
+                return stage.SubBatch.CreatedAt;
             }
 
-            // Если это первый этап, используем дату создания заказа
-            return stage.SubBatch.ProductionOrder.CreatedAt;
+            // Иначе начинаем после завершения предыдущего этапа
+            var previousStage = orderedStages[currentIndex - 1];
+            var previousEndDate = GetStageEndDate(previousStage, GetStageStartDate(previousStage, orderedStages, currentIndex - 1));
+
+            return previousEndDate;
         }
+
+        private DateTime GetStageEndDate(RouteStage stage, DateTime startDate)
+        {
+            // Если этап завершен, используем фактическое время
+            var execution = stage.StageExecutions.FirstOrDefault();
+            if (execution?.CompletedAt != null)
+                return execution.CompletedAt.Value;
+
+            // Если есть плановая дата окончания
+            if (stage.PlannedEndDate != null)
+                return stage.PlannedEndDate.Value;
+
+            // Иначе рассчитываем на основе планового времени
+            return startDate.AddHours((double)stage.PlannedTime);
+        }
+
 
         private DateTime? GetActualStartDate(RouteStage stage)
         {
@@ -146,18 +308,55 @@ namespace ProductionSystem.Controllers
         {
             return stage.StageExecutions.FirstOrDefault()?.CompletedAt;
         }
-
         private int GetStageProgress(RouteStage stage)
         {
-            return stage.Status switch
+            switch (stage.Status)
             {
-                "Completed" => 100,
-                "InProgress" => 50,
-                "Paused" => 50,
-                "Ready" => 0,
-                _ => 0
-            };
+                case "Completed":
+                    return 100;
+
+                case "InProgress":
+                    // Рассчитываем реальный процент выполнения на основе времени
+                    var execution = stage.StageExecutions.FirstOrDefault(e => e.Status == "Started");
+                    if (execution?.StartedAt != null)
+                    {
+                        var elapsedTime = DateTime.UtcNow - execution.StartedAt.Value;
+                        var elapsedHours = (decimal)elapsedTime.TotalHours - (execution.PauseTime ?? 0);
+
+                        if (stage.PlannedTime > 0)
+                        {
+                            var progress = (int)((elapsedHours / stage.PlannedTime) * 100);
+                            // Ограничиваем значение между 1 и 99 для работающих этапов
+                            return Math.Max(1, Math.Min(99, progress));
+                        }
+                    }
+                    return 25; // По умолчанию для работающих этапов
+
+                case "Paused":
+                    // Для приостановленных этапов также рассчитываем процент
+                    var pausedExecution = stage.StageExecutions.FirstOrDefault(e => e.Status == "Paused");
+                    if (pausedExecution?.StartedAt != null)
+                    {
+                        var elapsed = (pausedExecution.PausedAt ?? DateTime.UtcNow) - pausedExecution.StartedAt.Value;
+                        var elapsedHours = (decimal)elapsed.TotalHours - (pausedExecution.PauseTime ?? 0);
+
+                        if (stage.PlannedTime > 0)
+                        {
+                            var progress = (int)((elapsedHours / stage.PlannedTime) * 100);
+                            return Math.Max(1, Math.Min(99, progress));
+                        }
+                    }
+                    return 25;
+
+                case "Ready":
+                    return 0;
+
+                default:
+                    return 0;
+            }
         }
+
+
 
         private string GetStageDependencies(RouteStage stage)
         {
@@ -169,6 +368,12 @@ namespace ProductionSystem.Controllers
             return previousStage != null ? $"task_{previousStage.Id}" : "";
         }
 
+        private bool CanStageBeMoved(RouteStage stage)
+        {
+            return stage.Status == "Ready" || stage.Status == "Waiting";
+        }
+
+        // Методы из оригинального контроллера
         [HttpPost]
         public async Task<IActionResult> UpdateStageDates(int stageId, DateTime startDate, DateTime endDate)
         {
@@ -178,7 +383,6 @@ namespace ProductionSystem.Controllers
                 stage.PlannedStartDate = startDate;
                 stage.PlannedEndDate = endDate;
 
-                // Пересчитываем плановое время
                 var timeSpan = endDate - startDate;
                 stage.PlannedTime = (decimal)timeSpan.TotalHours;
 
@@ -192,47 +396,67 @@ namespace ProductionSystem.Controllers
         [HttpGet]
         public async Task<IActionResult> GetMachineUtilization(int? machineId, DateTime? startDate, DateTime? endDate)
         {
-            var query = _context.StageExecutions
-                .Include(se => se.RouteStage)
-                .ThenInclude(rs => rs.SubBatch)
-                .ThenInclude(sb => sb.ProductionOrder)
-                .ThenInclude(po => po.Detail)
-                .Include(se => se.Machine)
-                .Where(se => se.Status == "Completed");
-
-            if (machineId.HasValue)
+            try
             {
-                query = query.Where(se => se.MachineId == machineId.Value);
-            }
+                var query = _context.StageExecutions
+                    .Include(se => se.RouteStage)
+                    .ThenInclude(rs => rs.SubBatch)
+                    .ThenInclude(sb => sb.ProductionOrder)
+                    .ThenInclude(po => po.Detail)
+                    .Include(se => se.Machine)
+                    .Where(se => se.Status == "Completed" && se.ActualTime.HasValue);
 
-            if (startDate.HasValue)
-            {
-                query = query.Where(se => se.StartedAt >= startDate.Value);
-            }
-
-            if (endDate.HasValue)
-            {
-                query = query.Where(se => se.CompletedAt <= endDate.Value);
-            }
-
-            var executions = await query.ToListAsync();
-
-            var utilizationData = executions
-                .GroupBy(se => se.Machine?.Name ?? "Не назначен")
-                .Select(g => new
+                if (machineId.HasValue)
                 {
-                    machine = g.Key,
-                    totalTime = g.Sum(se => se.ActualTime ?? 0),
-                    changeoverTime = g.Where(se => se.RouteStage.StageType == "Changeover")
-                                      .Sum(se => se.ActualTime ?? 0),
-                    productionTime = g.Where(se => se.RouteStage.StageType == "Operation")
-                                      .Sum(se => se.ActualTime ?? 0),
-                    completedStages = g.Count()
-                })
-                .OrderByDescending(x => x.totalTime)
-                .ToList();
+                    query = query.Where(se => se.MachineId == machineId.Value);
+                }
 
-            return Json(utilizationData);
+                if (startDate.HasValue)
+                {
+                    var startUtc = startDate.Value.ToUniversalTime();
+                    query = query.Where(se => se.StartedAt >= startUtc);
+                }
+
+                if (endDate.HasValue)
+                {
+                    var endUtc = endDate.Value.ToUniversalTime();
+                    query = query.Where(se => se.CompletedAt <= endUtc);
+                }
+
+                var executions = await query.ToListAsync();
+
+                var utilizationData = executions
+                    .GroupBy(se => se.Machine?.Name ?? "Не назначен")
+                    .Select(g => new
+                    {
+                        machine = g.Key,
+                        totalTime = g.Sum(se => se.ActualTime ?? 0),
+                        changeoverTime = g.Where(se => se.RouteStage.StageType == "Changeover")
+                                          .Sum(se => se.ActualTime ?? 0),
+                        productionTime = g.Where(se => se.RouteStage.StageType == "Operation")
+                                          .Sum(se => se.ActualTime ?? 0),
+                        completedStages = g.Count()
+                    })
+                    .OrderByDescending(x => x.totalTime)
+                    .ToList();
+
+                return Json(utilizationData);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка в GetMachineUtilization: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                return StatusCode(500, new { error = "Ошибка загрузки данных о загрузке станков", details = ex.Message });
+            }
+        }
+
+        public async Task<IActionResult> MachineSchedule()
+        {
+            ViewBag.Machines = await _context.Machines
+                .Select(m => new { m.Id, m.Name })
+                .ToListAsync();
+
+            return View();
         }
     }
 }

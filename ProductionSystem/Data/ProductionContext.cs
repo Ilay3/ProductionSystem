@@ -5,8 +5,45 @@ namespace ProductionSystem.Data
 {
     public class ProductionContext : DbContext
     {
+        private readonly string? _connectionString;
+
+        // Определяем временную зону UTC+4 (московское время)
+        private static readonly TimeZoneInfo LocalTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Russia Time Zone 3");
+
         public ProductionContext(DbContextOptions<ProductionContext> options) : base(options)
         {
+        }
+
+        // Конструктор для передачи строки подключения
+        public ProductionContext(string connectionString)
+        {
+            _connectionString = connectionString;
+        }
+
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            if (!optionsBuilder.IsConfigured)
+            {
+                // Если есть строка подключения, используем её
+                var connectionString = _connectionString ??
+                    "Host=localhost;Database=ProductionSystemDB;Username=postgres;Password=postgres";
+
+                // Добавляем настройки для правильной работы с DateTime
+                optionsBuilder.UseNpgsql(connectionString, options =>
+                {
+                    // Включаем повторные попытки при сбоях
+                    options.EnableRetryOnFailure(
+                        maxRetryCount: 3,
+                        maxRetryDelay: TimeSpan.FromSeconds(5),
+                        errorCodesToAdd: null);
+                });
+
+                // Включаем детальное логирование в режиме разработки
+                optionsBuilder.EnableSensitiveDataLogging();
+                optionsBuilder.LogTo(Console.WriteLine, LogLevel.Information);
+            }
+
+            base.OnConfiguring(optionsBuilder);
         }
 
         // DbSets для всех сущностей
@@ -24,6 +61,19 @@ namespace ProductionSystem.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // Конфигурация для правильной обработки DateTime
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType == typeof(DateTime) || property.ClrType == typeof(DateTime?))
+                    {
+                        // Устанавливаем тип колонки для PostgreSQL
+                        property.SetColumnType("timestamp without time zone");
+                    }
+                }
+            }
 
             // Конфигурация Detail
             modelBuilder.Entity<Detail>(entity =>
@@ -170,6 +220,50 @@ namespace ProductionSystem.Data
                     .HasForeignKey(e => e.StageExecutionId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
+        }
+
+        // Методы для конвертации времени между UTC+4 и UTC
+        private static DateTime ConvertToUtc(DateTime localDateTime)
+        {
+            if (localDateTime.Kind == DateTimeKind.Utc)
+                return localDateTime;
+
+            if (localDateTime.Kind == DateTimeKind.Unspecified)
+            {
+                // Считаем неопределенное время как локальное (UTC+4)
+                localDateTime = DateTime.SpecifyKind(localDateTime, DateTimeKind.Local);
+            }
+
+            // Конвертируем из UTC+4 в UTC
+            return TimeZoneInfo.ConvertTimeToUtc(localDateTime, LocalTimeZone);
+        }
+
+        private static DateTime ConvertFromUtc(DateTime utcDateTime)
+        {
+            if (utcDateTime.Kind != DateTimeKind.Utc)
+                utcDateTime = DateTime.SpecifyKind(utcDateTime, DateTimeKind.Utc);
+
+            // Конвертируем из UTC в UTC+4
+            return TimeZoneInfo.ConvertTimeFromUtc(utcDateTime, LocalTimeZone);
+        }
+
+        // Методы для получения текущего времени в UTC+4
+        public static DateTime GetLocalNow()
+        {
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, LocalTimeZone);
+        }
+
+        public static DateTime ConvertToLocalTime(DateTime utcTime)
+        {
+            if (utcTime.Kind != DateTimeKind.Utc)
+                utcTime = DateTime.SpecifyKind(utcTime, DateTimeKind.Utc);
+
+            return TimeZoneInfo.ConvertTimeFromUtc(utcTime, LocalTimeZone);
+        }
+
+        public static DateTime ConvertToUtcTime(DateTime localTime)
+        {
+            return ConvertToUtc(localTime);
         }
     }
 }

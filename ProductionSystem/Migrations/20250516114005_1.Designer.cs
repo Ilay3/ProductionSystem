@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ProductionSystem.Data;
@@ -11,9 +12,11 @@ using ProductionSystem.Data;
 namespace ProductionSystem.Migrations
 {
     [DbContext(typeof(ProductionContext))]
-    partial class ProductionContextModelSnapshot : ModelSnapshot
+    [Migration("20250516114005_1")]
+    partial class _1
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

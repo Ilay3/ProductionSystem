@@ -29,6 +29,7 @@
     {
         Pending,
         Ready,
+        Waiting,     // Добавлен статус - в очереди ожидания
         InProgress,
         Paused,
         Completed,
@@ -50,6 +51,7 @@
     public enum ExecutionStatus
     {
         Pending,
+        Waiting,     // Добавлен статус - в очереди ожидания
         Started,
         Paused,
         Completed,
@@ -67,6 +69,8 @@
         Completed,
         Cancelled,
         Modified,
-        TimeModified
+        TimeModified,
+        QueueAdded,    // Добавление в очередь
+        QueueRemoved   // Удаление из очереди
     }
 }

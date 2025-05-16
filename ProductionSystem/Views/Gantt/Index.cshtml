@@ -21,11 +21,11 @@
                             {
                                 @if (ViewBag.SelectedOrderId == order.Id)
                                 {
-                                            <option value="@order.Id" selected>@order.Number - @order.Name</option>
+                                    <option value="@order.Id" selected>@order.Number - @order.Name</option>
                                 }
                                 else
                                 {
-                                            <option value="@order.Id">@order.Number - @order.Name</option>
+                                    <option value="@order.Id">@order.Number - @order.Name</option>
                                 }
                             }
                         </select>
@@ -38,11 +38,11 @@
                             {
                                 @if (ViewBag.SelectedMachineId == machine.Id)
                                 {
-                                            <option value="@machine.Id" selected>@machine.Name</option>
+                                    <option value="@machine.Id" selected>@machine.Name</option>
                                 }
                                 else
                                 {
-                                            <option value="@machine.Id">@machine.Name</option>
+                                    <option value="@machine.Id">@machine.Name</option>
                                 }
                             }
                         </select>
@@ -101,7 +101,14 @@
 </div>
 
 <script>
-    google.charts.load('current', { 'packages': ['gantt'] });
+    // Глобальная переменная для хранения данных
+    let ganttDataGlobal = [];
+
+    // ИСПРАВЛЕНИЕ: загружаем правильные пакеты Google Charts
+    google.charts.load('current', {
+        'packages': ['gantt', 'corechart'],
+        'language': 'ru'  // Русский язык для Google Charts
+    });
     google.charts.setOnLoadCallback(drawChart);
 
     function drawChart() {
@@ -117,26 +124,40 @@
         // Показываем индикатор загрузки
         document.getElementById('gantt_chart').innerHTML = '<div class="text-center"><i class="fa fa-spinner fa-spin fa-3x"></i><p>Загрузка данных...</p></div>';
 
-        fetch(`/Gantt/GetGanttData?orderId=${orderId}&machineId=${machineId}&startDate=${startDate}&endDate=${endDate}`)
-            .then(response => response.json())
+        const params = new URLSearchParams();
+        if (orderId) params.append('orderId', orderId);
+        if (machineId) params.append('machineId', machineId);
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+
+        fetch(`/Gantt/GetGanttData?${params.toString()}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('Полученные данные:', data);
+                ganttDataGlobal = data;
+
                 const dataTable = new google.visualization.DataTable();
 
-                // Определяем колонки
-                dataTable.addColumn('string', 'Task ID');
-                dataTable.addColumn('string', 'Task Name');
-                dataTable.addColumn('string', 'Resource');
-                dataTable.addColumn('date', 'Start Date');
-                dataTable.addColumn('date', 'End Date');
-                dataTable.addColumn('number', 'Duration');
-                dataTable.addColumn('number', 'Percent Complete');
-                dataTable.addColumn('string', 'Dependencies');
+                // Определяем колонки с русскими названиями
+                dataTable.addColumn('string', 'ID задачи');
+                dataTable.addColumn('string', 'Название задачи');
+                dataTable.addColumn('string', 'Ресурс');
+                dataTable.addColumn('date', 'Дата начала');
+                dataTable.addColumn('date', 'Дата окончания');
+                dataTable.addColumn('number', 'Длительность');
+                dataTable.addColumn('number', 'Процент выполнения');
+                dataTable.addColumn('string', 'Зависимости');
 
                 // Добавляем данные
                 data.forEach(item => {
-                    const startDate = item.actualStart ? new Date(item.actualStart) : 
+                    const startDate = item.actualStart ? new Date(item.actualStart) :
                                      (item.start ? new Date(item.start) : new Date());
-                    const endDate = item.actualEnd ? new Date(item.actualEnd) : 
+                    const endDate = item.actualEnd ? new Date(item.actualEnd) :
                                    (item.end ? new Date(item.end) : new Date(startDate.getTime() + item.duration));
 
                     dataTable.addRow([
@@ -147,74 +168,49 @@
                         endDate,
                         item.duration,
                         item.percentComplete,
-                        item.dependencies
+                        item.dependencies || ""
                     ]);
                 });
 
+                // Опции диаграммы с русскими подписями
                 const options = {
                     height: 600,
                     width: '100%',
                     gantt: {
                         trackHeight: 30,
                         barHeight: 20,
-                        criticalPathEnabled: true,
-                        criticalPathStyle: {
-                            stroke: '#e64a19',
-                            strokeWidth: 5
-                        },
+                        criticalPathEnabled: false,
                         innerGridHorizontalStroke: '#eeeeee',
                         innerGridVerticalStroke: '#eeeeee',
                         arrow: {
-                            angle: 100,
-                            length: 8,
-                            spaceAfter: 4
+                            angle: 0,
+                            length: 0,
+                            spaceAfter: 0
                         },
                         labelStyle: {
                             fontName: 'Arial',
-                            fontSize: 11
-                        }
+                            fontSize: 11,
+                            color: '#333'
+                        },
+                        dependenciesEnabled: false
                     }
                 };
 
-                const formatter = new google.visualization.TableColorFormat();
-
-                // Раскрашиваем строки по статусу
-                data.forEach((item, index) => {
-                    let color = '#f5f5f5'; // по умолчанию
-
-                    switch (item.status) {
-                        case 'Ready':
-                            color = '#6c757d'; // серый
-                            break;
-                        case 'InProgress':
-                            color = '#007bff'; // синий
-                            break;
-                        case 'Paused':
-                            color = '#ffc107'; // желтый
-                            break;
-                        case 'Completed':
-                            color = '#28a745'; // зеленый
-                            break;
-                    }
-
-                    if (item.stageType === 'Changeover') {
-                        color = '#ff6600'; // оранжевый для переналадки
-                    }
-
-                    formatter.addRange(index, index, 1, 7, 'white', color);
-                });
-
-                formatter.format(dataTable, 1);
-
                 const chart = new google.visualization.Gantt(document.getElementById('gantt_chart'));
 
-                // Добавляем обработчик клика
+                // Обработчик клика
                 google.visualization.events.addListener(chart, 'select', function () {
-                    const selection = chart.getSelection();
-                    if (selection.length > 0) {
-                        const row = selection[0].row;
-                        const item = data[row];
-                        showStageDetails(item);
+                    try {
+                        const selection = chart.getSelection();
+                        if (selection.length > 0) {
+                            const row = selection[0].row;
+                            if (ganttDataGlobal && ganttDataGlobal[row]) {
+                                const item = ganttDataGlobal[row];
+                                showStageDetails(item);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Ошибка обработки клика:', error);
                     }
                 });
 
@@ -222,7 +218,7 @@
             })
             .catch(error => {
                 console.error('Error loading Gantt data:', error);
-                document.getElementById('gantt_chart').innerHTML = '<div class="alert alert-danger">Ошибка загрузки данных</div>';
+                document.getElementById('gantt_chart').innerHTML = `<div class="alert alert-danger">Ошибка загрузки данных: ${error.message}</div>`;
             });
 
         // Загружаем данные о загрузке станков
@@ -234,26 +230,37 @@
         const startDate = document.getElementById('startDate').value;
         const endDate = document.getElementById('endDate').value;
 
-        fetch(`/Gantt/GetMachineUtilization?machineId=${machineId}&startDate=${startDate}&endDate=${endDate}`)
-            .then(response => response.json())
+        const params = new URLSearchParams();
+        if (machineId) params.append('machineId', machineId);
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+
+        fetch(`/Gantt/GetMachineUtilization?${params.toString()}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('Данные загрузки станков:', data);
+
                 const dataTable = new google.visualization.DataTable();
                 dataTable.addColumn('string', 'Станок');
                 dataTable.addColumn('number', 'Производство (ч)');
                 dataTable.addColumn('number', 'Переналадка (ч)');
-                dataTable.addColumn('number', 'Всего (ч)');
 
                 data.forEach(item => {
                     dataTable.addRow([
                         item.machine,
                         parseFloat(item.productionTime.toFixed(2)),
-                        parseFloat(item.changeoverTime.toFixed(2)),
-                        parseFloat(item.totalTime.toFixed(2))
+                        parseFloat(item.changeoverTime.toFixed(2))
                     ]);
                 });
 
                 const options = {
                     title: 'Загрузка станков (часы)',
+                    titleTextStyle: { fontSize: 16 },
                     chartArea: { width: '80%', height: '80%' },
                     hAxis: { title: 'Время (часы)', minValue: 0 },
                     vAxis: { title: 'Станки' },
@@ -261,20 +268,27 @@
                     series: {
                         0: { color: '#28a745' },  // Производство - зеленый
                         1: { color: '#ffc107' }   // Переналадка - желтый
-                    }
+                    },
+                    backgroundColor: 'white'
                 };
 
-                const chart = new google.visualization.BarChart(document.getElementById('utilization_chart'));
+                // ИСПРАВЛЕНИЕ: используем правильный конструктор
+                const chart = new google.visualization.ColumnChart(document.getElementById('utilization_chart'));
                 chart.draw(dataTable, options);
             })
             .catch(error => {
                 console.error('Error loading utilization data:', error);
+                document.getElementById('utilization_chart').innerHTML = `<div class="alert alert-danger">Ошибка загрузки данных о загрузке: ${error.message}</div>`;
             });
     }
 
     function showStageDetails(item) {
-        // Открываем детали этапа в новой вкладке
-        window.open(`/RouteStages/Details/${item.stageId}`, '_blank');
+        if (item && item.stageId && item.stageId > 0) {
+            window.open(`/RouteStages/Details/${item.stageId}`, '_blank');
+        } else {
+            console.error('Нет stageId в элементе:', item);
+            alert('Ошибка: не удается открыть детали этапа');
+        }
     }
 
     // Инициализация дат

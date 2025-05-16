@@ -20,17 +20,21 @@ namespace ProductionSystem.Controllers
 
         public async Task<IActionResult> ProductionSummary(DateTime? startDate, DateTime? endDate)
         {
-            startDate = (startDate ?? DateTime.Today.AddDays(-30)).ToUniversalTime();
-            endDate = (endDate ?? DateTime.Today).ToUniversalTime().AddDays(1); // до конца дня
+            var start = startDate?.Date ?? DateTime.Today.AddDays(-30);
+            var end = endDate?.Date.AddDays(1) ?? DateTime.Today.AddDays(1);
+
+            var startUtc = start.ToUniversalTime();
+            var endUtc = end.ToUniversalTime();
 
             var executions = await _context.StageExecutions
-                .Include(se => se.RouteStage)
-                .ThenInclude(rs => rs.SubBatch)
-                .ThenInclude(sb => sb.ProductionOrder)
-                .ThenInclude(po => po.Detail)
-                .Include(se => se.Machine)
-                .Where(se => se.CompletedAt >= startDate && se.CompletedAt <= endDate && se.Status == "Completed")
-                .ToListAsync();
+                    .Include(se => se.RouteStage)
+                    .ThenInclude(rs => rs.SubBatch)
+                    .ThenInclude(sb => sb.ProductionOrder)
+                    .ThenInclude(po => po.Detail)
+                    .Include(se => se.Machine)
+                    .Where(se => se.CompletedAt >= startUtc && se.CompletedAt <= endUtc && se.Status == "Completed")
+                    .ToListAsync();
+
 
             var summary = new
             {

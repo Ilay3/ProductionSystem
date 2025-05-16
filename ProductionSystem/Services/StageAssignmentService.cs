@@ -74,7 +74,8 @@ namespace ProductionSystem.Services
                 Order = mainStage.Order - 1, // Ставим перед основным этапом
                 PlannedTime = changeoverTime,
                 Quantity = 1,
-                Status = "Ready"
+                Status = "Ready",
+                CreatedAt = ProductionContext.GetLocalNow()
             };
 
             _context.RouteStages.Add(changeoverStage);

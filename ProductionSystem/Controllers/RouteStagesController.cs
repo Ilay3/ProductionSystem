@@ -132,5 +132,48 @@ namespace ProductionSystem.Controllers
 
             return RedirectToAction(nameof(Details), new { id });
         }
+
+        [HttpPost]
+        public async Task<IActionResult> StartStage(int id, string? @operator)
+        {
+            var routeStage = await _context.RouteStages
+                .Include(rs => rs.SubBatch)
+                .FirstOrDefaultAsync(rs => rs.Id == id);
+
+            if (routeStage == null || routeStage.Status != "Ready")
+            {
+                return Json(new { success = false, message = "Этап недоступен для запуска" });
+            }
+
+            // Проверяем, что предыдущий этап завершен
+            var previousStage = await _context.RouteStages
+                .Where(rs => rs.SubBatchId == routeStage.SubBatchId && rs.Order < routeStage.Order)
+                .OrderByDescending(rs => rs.Order)
+                .FirstOrDefaultAsync();
+
+            if (previousStage != null && previousStage.Status != "Completed")
+            {
+                return Json(new { success = false, message = "Предыдущий этап не завершен" });
+            }
+
+            // Создаем выполнение этапа
+            var execution = new StageExecution
+            {
+                RouteStageId = id,
+                MachineId = routeStage.MachineId,
+                Operator = @operator,
+                Status = "Started",
+                StartedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.StageExecutions.Add(execution);
+            routeStage.Status = "InProgress";
+
+            await _context.SaveChangesAsync();
+
+            return Json(new { success = true, message = "Этап успешно запущен" });
+        }
+
     }
 }

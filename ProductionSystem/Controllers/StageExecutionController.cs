@@ -2,16 +2,19 @@
 using Microsoft.EntityFrameworkCore;
 using ProductionSystem.Data;
 using ProductionSystem.Models;
+using ProductionSystem.Services;
 
 namespace ProductionSystem.Controllers
 {
     public class StageExecutionController : Controller
     {
         private readonly ProductionContext _context;
+        private readonly IStageAutomationService _automationService;
 
-        public StageExecutionController(ProductionContext context)
+        public StageExecutionController(ProductionContext context, IStageAutomationService automationService)
         {
             _context = context;
+            _automationService = automationService;
         }
 
         public async Task<IActionResult> Index(int? machineId)
@@ -66,8 +69,8 @@ namespace ProductionSystem.Controllers
                 MachineId = routeStage.MachineId,
                 Operator = @operator,
                 Status = "Started",
-                StartedAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow
+                StartedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified),
+                CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
             };
 
             _context.StageExecutions.Add(execution);
@@ -97,14 +100,24 @@ namespace ProductionSystem.Controllers
                 return RedirectToAction("Details", new { id });
             }
 
-            execution.Status = "Paused";
-            execution.PausedAt = DateTime.UtcNow;
-            execution.RouteStage.Status = "Paused";
+            try
+            {
+                execution.Status = "Paused";
+                // ИСПРАВЛЕНИЕ: убираем Kind из DateTime
+                execution.PausedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                execution.RouteStage.Status = "Paused";
 
-            await _context.SaveChangesAsync();
-            await AddExecutionLog(id, "Paused", execution.Operator, "Этап поставлен на паузу");
+                await _context.SaveChangesAsync();
+                await AddExecutionLog(id, "Paused", execution.Operator, "Этап поставлен на паузу");
 
-            TempData["Message"] = "Этап поставлен на паузу";
+                TempData["Message"] = "Этап поставлен на паузу";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Ошибка при постановке на паузу: {ex.Message}";
+                Console.WriteLine($"Error pausing stage {id}: {ex}");
+            }
+
             return RedirectToAction("Details", new { id });
         }
 
@@ -121,21 +134,31 @@ namespace ProductionSystem.Controllers
                 return RedirectToAction("Details", new { id });
             }
 
-            // Вычисляем время паузы
-            if (execution.PausedAt.HasValue)
+            try
             {
-                var pauseTime = DateTime.UtcNow - execution.PausedAt.Value;
-                execution.PauseTime = (execution.PauseTime ?? 0) + (decimal)pauseTime.TotalHours;
+                // Вычисляем время паузы
+                if (execution.PausedAt.HasValue)
+                {
+                    var pauseTime = DateTime.UtcNow - execution.PausedAt.Value;
+                    execution.PauseTime = (execution.PauseTime ?? 0) + (decimal)pauseTime.TotalHours;
+                }
+
+                execution.Status = "Started";
+                // ИСПРАВЛЕНИЕ: убираем Kind из DateTime
+                execution.ResumedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                execution.RouteStage.Status = "InProgress";
+
+                await _context.SaveChangesAsync();
+                await AddExecutionLog(id, "Resumed", execution.Operator, "Этап возобновлен");
+
+                TempData["Message"] = "Этап возобновлен";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Ошибка при возобновлении: {ex.Message}";
+                Console.WriteLine($"Error resuming stage {id}: {ex}");
             }
 
-            execution.Status = "Started";
-            execution.ResumedAt = DateTime.UtcNow;
-            execution.RouteStage.Status = "InProgress";
-
-            await _context.SaveChangesAsync();
-            await AddExecutionLog(id, "Resumed", execution.Operator, "Этап возобновлен");
-
-            TempData["Message"] = "Этап возобновлен";
             return RedirectToAction("Details", new { id });
         }
 
@@ -153,32 +176,42 @@ namespace ProductionSystem.Controllers
                 return RedirectToAction("Details", new { id });
             }
 
-            // Вычисляем общее время выполнения
-            var totalTime = DateTime.UtcNow - execution.StartedAt!.Value;
-            execution.ActualTime = (decimal)totalTime.TotalHours - (execution.PauseTime ?? 0);
-
-            execution.Status = "Completed";
-            execution.CompletedAt = DateTime.UtcNow;
-            execution.Notes = notes;
-
-            // Проверяем превышение времени
-            var plannedTime = execution.RouteStage.PlannedTime;
-            if (execution.ActualTime > plannedTime)
+            try
             {
-                execution.TimeExceededReason = timeExceededReason;
-                var exceededBy = execution.ActualTime - plannedTime;
-                TempData["Warning"] = $"Этап превысил плановое время на {exceededBy:F2} ч ({(exceededBy / plannedTime * 100):F1}%)";
+                // Вычисляем общее время выполнения
+                var totalTime = DateTime.UtcNow - execution.StartedAt!.Value;
+                execution.ActualTime = (decimal)totalTime.TotalHours - (execution.PauseTime ?? 0);
+
+                execution.Status = "Completed";
+                // ИСПРАВЛЕНИЕ: убираем Kind из DateTime
+                execution.CompletedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                execution.Notes = notes;
+
+                // Проверяем превышение времени
+                var plannedTime = execution.RouteStage.PlannedTime;
+                if (execution.ActualTime > plannedTime)
+                {
+                    execution.TimeExceededReason = timeExceededReason;
+                    var exceededBy = execution.ActualTime - plannedTime;
+                    TempData["Warning"] = $"Этап превысил плановое время на {exceededBy:F2} ч ({(exceededBy / plannedTime * 100):F1}%)";
+                }
+
+                execution.RouteStage.Status = "Completed";
+
+                await _context.SaveChangesAsync();
+                await AddExecutionLog(id, "Completed", execution.Operator, $"Этап завершен. {notes}");
+
+                // Проверяем завершение всей подпартии
+                await CheckSubBatchCompletion(execution.RouteStage.SubBatchId);
+
+                TempData["Message"] = "Этап успешно завершен";
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = $"Ошибка при завершении этапа: {ex.Message}";
+                Console.WriteLine($"Error completing stage {id}: {ex}");
             }
 
-            execution.RouteStage.Status = "Completed";
-
-            await _context.SaveChangesAsync();
-            await AddExecutionLog(id, "Completed", execution.Operator, $"Этап завершен. {notes}");
-
-            // Проверяем завершение всей подпартии
-            await CheckSubBatchCompletion(execution.RouteStage.SubBatchId);
-
-            TempData["Message"] = "Этап успешно завершен";
             return RedirectToAction("Index", "RouteStages", new { subBatchId = execution.RouteStage.SubBatchId });
         }
 
@@ -249,7 +282,7 @@ namespace ProductionSystem.Controllers
             // Вычисляем текущее время выполнения
             if (execution.Status == "Started" && execution.StartedAt.HasValue)
             {
-                var currentTime = DateTime.UtcNow - execution.StartedAt.Value;
+                var currentTime = ProductionContext.GetLocalNow() - execution.StartedAt.Value;
                 ViewBag.CurrentTime = currentTime.TotalHours - (double)(execution.PauseTime ?? 0);
             }
 
@@ -264,12 +297,14 @@ namespace ProductionSystem.Controllers
                 Action = action,
                 Operator = @operator,
                 Notes = notes,
-                Timestamp = DateTime.UtcNow
+                // ИСПРАВЛЕНИЕ: убираем Kind из DateTime
+                Timestamp = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified)
             };
 
             _context.ExecutionLogs.Add(log);
             await _context.SaveChangesAsync();
         }
+
 
         private async Task CheckSubBatchCompletion(int subBatchId)
         {

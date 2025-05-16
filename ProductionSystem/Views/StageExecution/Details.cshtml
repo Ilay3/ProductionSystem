@@ -64,7 +64,10 @@
                         }
                         else if (ViewBag.CurrentTime != null)
                         {
-                            <p><strong>Текущее время:</strong> @((double)ViewBag.CurrentTime).ToString("F2") ч</p>
+                          
+                            var currentTimeValue = (double)ViewBag.CurrentTime;
+                            
+                            <p><strong>Текущее время:</strong> @currentTimeValue.ToString("F2") ч</p>
                         }
                         @if (Model.PauseTime.HasValue && Model.PauseTime > 0)
                         {
