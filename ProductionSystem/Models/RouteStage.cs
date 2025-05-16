@@ -1,5 +1,6 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using ProductionSystem.Helpers;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
 
 namespace ProductionSystem.Models
 {
@@ -55,7 +56,14 @@ namespace ProductionSystem.Models
         public int Quantity { get; set; }
 
         /// <summary>
-        /// Статус этапа
+        /// Статус этапа: 
+        /// Pending - ожидает запуска
+        /// Ready - готов к запуску
+        /// Waiting - в очереди ожидания
+        /// InProgress - выполняется
+        /// Paused - приостановлен
+        /// Completed - завершен
+        /// Cancelled - отменен
         /// </summary>
         [Required]
         [StringLength(50)]
@@ -71,5 +79,29 @@ namespace ProductionSystem.Models
         public virtual Operation? Operation { get; set; }
         public virtual Machine? Machine { get; set; }
         public virtual ICollection<StageExecution> StageExecutions { get; set; } = new List<StageExecution>();
+
+        // Дополнительные свойства для удобства
+        public string StatusDisplayName => StatusHelper.GetStatusDisplayName(Status);
+        public string StageTypeDisplayName => StatusHelper.GetStageTypeDisplayName(StageType);
+
+        /// <summary>
+        /// Проверяет, может ли этап быть запущен
+        /// </summary>
+        public bool CanBeStarted => Status == "Ready" && MachineId.HasValue;
+
+        /// <summary>
+        /// Проверяет, в очереди ли этап
+        /// </summary>
+        public bool IsInQueue => Status == "Waiting";
+
+        /// <summary>
+        /// Проверяет, выполняется ли этап
+        /// </summary>
+        public bool IsInProgress => Status == "InProgress";
+
+        /// <summary>
+        /// Проверяет, завершен ли этап
+        /// </summary>
+        public bool IsCompleted => Status == "Completed";
     }
 }

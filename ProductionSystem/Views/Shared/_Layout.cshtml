@@ -1,69 +1,288 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@ViewData["Title"] - Система управления производством</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/gantt.css" asp-append-version="true" />
     <script src="https://www.gstatic.com/charts/loader.js"></script>
+
+    <style>
+        /* Дополнительные стили для улучшения UX */
+        .btn-group-action {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        .status-pending .status-indicator {
+            background-color: #6c757d;
+        }
+
+        .status-ready .status-indicator {
+            background-color: #17a2b8;
+        }
+
+        .status-waiting .status-indicator {
+            background-color: #ffc107;
+        }
+
+        .status-inprogress .status-indicator {
+            background-color: #007bff;
+        }
+
+        .status-paused .status-indicator {
+            background-color: #fd7e14;
+        }
+
+        .status-completed .status-indicator {
+            background-color: #28a745;
+        }
+
+        .status-cancelled .status-indicator {
+            background-color: #dc3545;
+        }
+
+        /* Улучшенная типография */
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .lead {
+            font-size: 1.1rem;
+            color: #6c757d;
+        }
+
+        /* Анимации кнопок */
+        .btn {
+            transition: all 0.2s ease-in-out;
+        }
+
+            .btn:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+
+        /* Стили для карточек */
+        .card {
+            border: none;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            transition: box-shadow 0.2s ease-in-out;
+        }
+
+            .card:hover {
+                box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+            }
+    </style>
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-dark bg-dark shadow-sm">
             <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">Производство</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
+                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
+                    <i class="fas fa-industry me-2"></i>Производство
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse"
+                        aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Главная</a>
+                            <a class="nav-link" asp-area="" asp-controller="Home" asp-action="Index">
+                                <i class="fas fa-home me-1"></i>Главная
+                            </a>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                Справочники
+                                <i class="fas fa-book me-1"></i>Справочники
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" asp-controller="Details" asp-action="Index">Детали</a></li>
-                                <li><a class="dropdown-item" asp-controller="MachineTypes" asp-action="Index">Типы станков</a></li>
-                                <li><a class="dropdown-item" asp-controller="Machines" asp-action="Index">Станки</a></li>
-                                <li><a class="dropdown-item" asp-controller="Operations" asp-action="Index">Операции</a></li>
-                                <li><a class="dropdown-item" asp-controller="Changeovers" asp-action="Index">Переналадки</a></li>
+                                <li>
+                                    <a class="dropdown-item" asp-controller="Details" asp-action="Index">
+                                        <i class="fas fa-puzzle-piece me-2"></i>Детали
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" asp-controller="MachineTypes" asp-action="Index">
+                                        <i class="fas fa-tags me-2"></i>Типы станков
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" asp-controller="Machines" asp-action="Index">
+                                        <i class="fas fa-cogs me-2"></i>Станки
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" asp-controller="Operations" asp-action="Index">
+                                        <i class="fas fa-tasks me-2"></i>Операции
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" asp-controller="Changeovers" asp-action="Index">
+                                        <i class="fas fa-exchange-alt me-2"></i>Переналадки
+                                    </a>
+                                </li>
                             </ul>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="ProductionOrders" asp-action="Index">Производство</a>
+                            <a class="nav-link" asp-controller="ProductionOrders" asp-action="Index">
+                                <i class="fas fa-clipboard-list me-1"></i>Производство
+                            </a>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                Диаграммы
+                                <i class="fas fa-chart-gantt me-1"></i>Диаграммы
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" asp-controller="Gantt" asp-action="Index">Диаграмма Ганта</a></li>
-                                <li><a class="dropdown-item" asp-controller="Gantt" asp-action="MachineSchedule">Расписание станков</a></li>
+                                <li>
+                                    <a class="dropdown-item" asp-controller="Gantt" asp-action="Index">
+                                        <i class="fas fa-chart-gantt me-2"></i>Диаграмма Ганта
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" asp-controller="Gantt" asp-action="MachineSchedule">
+                                        <i class="fas fa-calendar-alt me-2"></i>Расписание станков
+                                    </a>
+                                </li>
                             </ul>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-controller="Reports" asp-action="Index">Отчеты</a>
+                            <a class="nav-link" asp-controller="Reports" asp-action="Index">
+                                <i class="fas fa-chart-line me-1"></i>Отчеты
+                            </a>
                         </li>
+                    </ul>
+
+                    <!-- Индикатор состояния системы -->
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <span class="navbar-text">
+                                <i class="fas fa-circle text-success me-1" id="systemStatus"></i>
+                                <span id="systemStatusText">Система работает</span>
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
     </header>
-    <div class="container">
-        <main role="main" class="pb-3">
+
+    <div class="container-fluid">
+        <main role="main" class="py-4">
+            @if (TempData["Message"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>@TempData["Message"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>@TempData["Error"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+
+            @if (TempData["Warning"] != null)
+            {
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>@TempData["Warning"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+
             @RenderBody()
         </main>
     </div>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2025 - Система управления производством
+    <footer class="border-top footer text-muted bg-light">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center py-3">
+                <span>&copy; 2025 - Система управления производством</span>
+                <span class="text-muted">
+                    <i class="fas fa-code me-1"></i>
+                    Версия 1.0
+                </span>
+            </div>
         </div>
     </footer>
+
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+
+    <script>
+        // Глобальная функция для показа уведомлений
+        window.showToast = function(message, type = 'info') {
+            const toastTypes = {
+                'success': { class: 'alert-success', icon: 'fa-check-circle' },
+                'error': { class: 'alert-danger', icon: 'fa-exclamation-circle' },
+                'warning': { class: 'alert-warning', icon: 'fa-exclamation-triangle' },
+                'info': { class: 'alert-info', icon: 'fa-info-circle' }
+            };
+
+            const toastConfig = toastTypes[type] || toastTypes['info'];
+
+            const toast = $(`
+                <div class="alert ${toastConfig.class} alert-dismissible fade show position-fixed toast-notification"
+                     style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+                    <i class="fas ${toastConfig.icon} me-2"></i>${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `);
+
+            $('body').append(toast);
+
+            // Автоматическое удаление через 5 секунд
+            setTimeout(() => {
+                toast.alert('close');
+            }, 5000);
+        };
+
+        // Проверка состояния системы
+        function checkSystemStatus() {
+            fetch('/api/system/status')
+                .then(response => response.json())
+                .then(data => {
+                    const statusIcon = document.getElementById('systemStatus');
+                    const statusText = document.getElementById('systemStatusText');
+
+                    if (data.status === 'online') {
+                        statusIcon.className = 'fas fa-circle text-success me-1';
+                        statusText.textContent = 'Система работает';
+                    } else {
+                        statusIcon.className = 'fas fa-circle text-danger me-1';
+                        statusText.textContent = 'Система недоступна';
+                    }
+                })
+                .catch(() => {
+                    const statusIcon = document.getElementById('systemStatus');
+                    const statusText = document.getElementById('systemStatusText');
+                    statusIcon.className = 'fas fa-circle text-warning me-1';
+                    statusText.textContent = 'Проверка связи...';
+                });
+        }
+
+        // Проверяем состояние системы каждые 30 секунд
+        setInterval(checkSystemStatus, 30000);
+        checkSystemStatus();
+    </script>
+
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

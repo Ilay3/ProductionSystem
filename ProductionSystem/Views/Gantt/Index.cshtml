@@ -2,6 +2,219 @@
     ViewData["Title"] = "Диаграмма Ганта";
 }
 
+<style>
+    /* Стили для диаграммы Ганта */
+    .gantt-container {
+        position: relative;
+        border: 1px solid #ddd;
+        border-radius: 0.375rem;
+        background: white;
+    }
+
+    .gantt-loading {
+        background-color: #f8f9fa;
+        border: 1px dashed #dee2e6;
+        border-radius: 0.375rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+    }
+
+    /* Стили для карточек статистики */
+    .stat-card {
+        border: none;
+        border-radius: 0.5rem;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        transition: all 0.15s ease-in-out;
+    }
+
+        .stat-card:hover {
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+            transform: translateY(-2px);
+        }
+
+    /* Цвета для разных статусов */
+    .status-pending {
+        background-color: #6c757d;
+    }
+
+    .status-ready {
+        background-color: #17a2b8;
+    }
+
+    .status-waiting {
+        background-color: #ffc107;
+    }
+
+    .status-inprogress {
+        background-color: #007bff;
+    }
+
+    .status-paused {
+        background-color: #fd7e14;
+    }
+
+    .status-completed {
+        background-color: #28a745;
+    }
+
+    .status-cancelled {
+        background-color: #dc3545;
+    }
+
+    /* Анимации для уведомлений */
+    @@keyframes slideInRight {
+        from
+
+    {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+
+    }
+
+    .toast-notification {
+        animation: slideInRight 0.3s ease-out;
+    }
+
+    /* Стили для очередей */
+    .queue-item {
+        background-color: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        border-radius: 0.25rem;
+    }
+
+        .queue-item:hover {
+            background-color: #ffeaa7;
+        }
+
+    /* Стили для переналадок */
+    .changeover-item {
+        background-color: #e1ecf4;
+        border-left: 4px solid #6c757d;
+        padding: 0.75rem;
+        margin-bottom: 0.5rem;
+        border-radius: 0.25rem;
+    }
+
+    /* Фильтры */
+    .filters-container {
+        background-color: #f8f9fa;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    /* Кнопки действий */
+    .action-button {
+        border: none;
+        border-radius: 0.25rem;
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.025em;
+        transition: all 0.15s ease-in-out;
+    }
+
+        .action-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+    /* Модальные окна */
+    .modal-content {
+        border: none;
+        border-radius: 0.5rem;
+        box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.175);
+    }
+
+    .modal-header {
+        border-bottom: 1px solid #dee2e6;
+        border-top-left-radius: 0.5rem;
+        border-top-right-radius: 0.5rem;
+    }
+
+    /* Таблицы */
+    .table-responsive {
+        border-radius: 0.375rem;
+        overflow: hidden;
+    }
+
+    .table th {
+        background-color: #f8f9fa;
+        border-top: none;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.05em;
+        padding: 0.75rem;
+    }
+
+    /* Бейджи статусов */
+    .badge {
+        font-size: 0.75em;
+        font-weight: 500;
+        padding: 0.35em 0.65em;
+        border-radius: 0.25rem;
+    }
+
+    /* Прогресс бары */
+    .progress {
+        height: 1rem;
+        background-color: #e9ecef;
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        transition: width 0.6s ease;
+    }
+
+    /* Адаптивность */
+    @@media (max-width: 768px) {
+        .filters-container .row > div
+
+    {
+        margin-bottom: 1rem;
+    }
+
+    .gantt-container {
+        overflow-x: auto;
+    }
+
+    .table-responsive {
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+    }
+
+    }
+
+    /* Темная тема для диаграммы (опционально) */
+    @@media (prefers-color-scheme: dark) {
+        .gantt-container
+
+    {
+        background-color: #2d3748;
+        border-color: #4a5568;
+    }
+
+    .filters-container {
+        background-color: #2d3748;
+        color: #e2e8f0;
+    }
+
+    }
+</style>
+
 <div class="row">
     <div class="col-md-12">
         <h2>@ViewData["Title"]</h2>
@@ -65,6 +278,19 @@
             </div>
         </div>
 
+        <!-- Кнопки управления -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <button id="processAutomation" class="btn btn-success me-2" onclick="processAutomaticExecution()">
+                    <i class="fas fa-play"></i> Запустить автоматику
+                </button>
+                <button class="btn btn-warning" onclick="showQueueManagement()">
+                    <i class="fas fa-list"></i> Управление очередями
+                </button>
+                <span id="automationStatus" class="badge bg-secondary ms-3">Автоматика остановлена</span>
+            </div>
+        </div>
+
         <!-- Легенда -->
         <div class="card mb-3">
             <div class="card-body">
@@ -72,10 +298,11 @@
                     <div class="col-md-12">
                         <strong>Легенда:</strong>
                         <span class="badge bg-secondary ms-2">Готов к запуску</span>
+                        <span class="badge bg-info ms-2">В очереди</span>
                         <span class="badge bg-primary ms-2">В работе</span>
                         <span class="badge bg-warning ms-2">На паузе</span>
                         <span class="badge bg-success ms-2">Завершен</span>
-                        <span class="badge bg-warning ms-2" style="background-color: #ffa500 !important;">Переналадка</span>
+                        <span class="badge bg-dark ms-2">Переналадка</span>
                     </div>
                 </div>
             </div>
@@ -84,7 +311,7 @@
         <!-- Диаграмма -->
         <div class="card">
             <div class="card-body">
-                <div id="gantt_chart" style="height: 600px; width: 100%;"></div>
+                <div id="gantt_chart" style="height: 700px; width: 100%;"></div>
             </div>
         </div>
 
@@ -100,19 +327,54 @@
     </div>
 </div>
 
-<script>
-    // Глобальная переменная для хранения данных
-    let ganttDataGlobal = [];
+<!-- Modal для управления очередями -->
+<div class="modal fade" id="queueModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Управление очередями</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="queueContent">Загрузка...</div>
+            </div>
+        </div>
+    </div>
+</div>
 
-    // ИСПРАВЛЕНИЕ: загружаем правильные пакеты Google Charts
+<!-- Modal для действий с этапом -->
+<div class="modal fade" id="stageActionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Действия с этапом</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="stageInfo"></div>
+                <div id="stageActions" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Глобальные переменные
+    let ganttChart = null;
+    let ganttDataGlobal = [];
+    let ganttData = null;
+    let selectedStageId = null;
+
+    // Загрузка библиотеки Google Charts
     google.charts.load('current', {
-        'packages': ['gantt', 'corechart'],
-        'language': 'ru'  // Русский язык для Google Charts
+        'packages': ['gantt', 'corechart', 'table'],
+        'language': 'ru'
     });
     google.charts.setOnLoadCallback(drawChart);
 
     function drawChart() {
         updateGantt();
+        setInterval(updateGantt, 30000); // Обновляем каждые 30 секунд
     }
 
     function updateGantt() {
@@ -122,7 +384,8 @@
         const endDate = document.getElementById('endDate').value;
 
         // Показываем индикатор загрузки
-        document.getElementById('gantt_chart').innerHTML = '<div class="text-center"><i class="fa fa-spinner fa-spin fa-3x"></i><p>Загрузка данных...</p></div>';
+        document.getElementById('gantt_chart').innerHTML =
+            '<div class="text-center p-5"><i class="fa fa-spinner fa-spin fa-3x"></i><p class="mt-3">Загрузка данных...</p></div>';
 
         const params = new URLSearchParams();
         if (orderId) params.append('orderId', orderId);
@@ -140,89 +403,117 @@
             .then(data => {
                 console.log('Полученные данные:', data);
                 ganttDataGlobal = data;
-
-                const dataTable = new google.visualization.DataTable();
-
-                // Определяем колонки с русскими названиями
-                dataTable.addColumn('string', 'ID задачи');
-                dataTable.addColumn('string', 'Название задачи');
-                dataTable.addColumn('string', 'Ресурс');
-                dataTable.addColumn('date', 'Дата начала');
-                dataTable.addColumn('date', 'Дата окончания');
-                dataTable.addColumn('number', 'Длительность');
-                dataTable.addColumn('number', 'Процент выполнения');
-                dataTable.addColumn('string', 'Зависимости');
-
-                // Добавляем данные
-                data.forEach(item => {
-                    const startDate = item.actualStart ? new Date(item.actualStart) :
-                                     (item.start ? new Date(item.start) : new Date());
-                    const endDate = item.actualEnd ? new Date(item.actualEnd) :
-                                   (item.end ? new Date(item.end) : new Date(startDate.getTime() + item.duration));
-
-                    dataTable.addRow([
-                        item.taskId,
-                        item.taskName,
-                        item.resource,
-                        startDate,
-                        endDate,
-                        item.duration,
-                        item.percentComplete,
-                        item.dependencies || ""
-                    ]);
-                });
-
-                // Опции диаграммы с русскими подписями
-                const options = {
-                    height: 600,
-                    width: '100%',
-                    gantt: {
-                        trackHeight: 30,
-                        barHeight: 20,
-                        criticalPathEnabled: false,
-                        innerGridHorizontalStroke: '#eeeeee',
-                        innerGridVerticalStroke: '#eeeeee',
-                        arrow: {
-                            angle: 0,
-                            length: 0,
-                            spaceAfter: 0
-                        },
-                        labelStyle: {
-                            fontName: 'Arial',
-                            fontSize: 11,
-                            color: '#333'
-                        },
-                        dependenciesEnabled: false
-                    }
-                };
-
-                const chart = new google.visualization.Gantt(document.getElementById('gantt_chart'));
-
-                // Обработчик клика
-                google.visualization.events.addListener(chart, 'select', function () {
-                    try {
-                        const selection = chart.getSelection();
-                        if (selection.length > 0) {
-                            const row = selection[0].row;
-                            if (ganttDataGlobal && ganttDataGlobal[row]) {
-                                const item = ganttDataGlobal[row];
-                                showStageDetails(item);
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Ошибка обработки клика:', error);
-                    }
-                });
-
-                chart.draw(dataTable, options);
+                drawGanttChart(data);
+                loadMachineUtilization();
             })
             .catch(error => {
                 console.error('Error loading Gantt data:', error);
-                document.getElementById('gantt_chart').innerHTML = `<div class="alert alert-danger">Ошибка загрузки данных: ${error.message}</div>`;
+                document.getElementById('gantt_chart').innerHTML =
+                    `<div class="alert alert-danger">Ошибка загрузки данных: ${error.message}</div>`;
             });
+    }
 
-        // Загружаем данные о загрузке станков
-        loadMachineUtilization();
+    function drawGanttChart(data) {
+        const ganttData = new google.visualization.DataTable();
+
+        // Правильная структура для диаграммы Ганта
+        ganttData.addColumn('string', 'Task ID');
+        ganttData.addColumn('string', 'Task Name');
+        ganttData.addColumn('string', 'Resource');
+        ganttData.addColumn('date', 'Start Date');
+        ganttData.addColumn('date', 'End Date');
+        ganttData.addColumn('number', 'Duration');
+        ganttData.addColumn('number', 'Percent Complete');
+        ganttData.addColumn('string', 'Dependencies');
+
+        // Добавляем строки
+        data.forEach(item => {
+            const startDate = parseDate(item.actualStart || item.start);
+            const endDate = parseDate(item.actualEnd || item.end);
+
+            // Duration в миллисекундах для Google Charts
+            const duration = endDate.getTime() - startDate.getTime();
+
+            ganttData.addRow([
+                item.taskId,
+                item.taskName,
+                item.resource || 'Не назначен',
+                startDate,
+                endDate,
+                duration,
+                item.percentComplete || 0,
+                item.dependencies || null
+            ]);
+        });
+
+        // Опции диаграммы
+        const options = {
+            height: 700,
+            width: '100%',
+            gantt: {
+                trackHeight: 35,
+                barHeight: 25,
+                criticalPathEnabled: false,
+                innerGridHorizontalStroke: '#eeeeee',
+                innerGridVerticalStroke: '#eeeeee',
+                labelStyle: {
+                    fontName: 'Arial',
+                    fontSize: 12,
+                    color: '#333'
+                },
+                // Цвета по статусам
+                palette: [
+                    {
+                        "color": "#e7e7e7", // Pending
+                        "dark": "#d0d0d0",
+                        "light": "#f0f0f0"
+                    },
+                    {
+                        "color": "#0d6efd", // InProgress
+                        "dark": "#0a58ca",
+                        "light": "#6ea8fe"
+                    },
+                    {
+                        "color": "#ffc107", // Paused
+                        "dark": "#ffb000",
+                        "light": "#ffda6a"
+                    },
+                    {
+                        "color": "#198754", // Completed
+                        "dark": "#146c43",
+                        "light": "#75b798"
+                    },
+                    {
+                        "color": "#6c757d", // Changeover
+                        "dark": "#5a5a5a",
+                        "light": "#8e8e8e"
+                    }
+                ]
+            }
+        };
+
+        ganttChart = new google.visualization.Gantt(document.getElementById('gantt_chart'));
+
+        // Обработчик кликов
+        google.visualization.events.addListener(ganttChart, 'select', function () {
+            const selection = ganttChart.getSelection();
+            if (selection.length > 0) {
+                const row = selection[0].row;
+                if (ganttDataGlobal && ganttDataGlobal[row]) {
+                    showStageActions(ganttDataGlobal[row]);
+                }
+            }
+        });
+
+        ganttChart.draw(ganttData, options);
+    }
+
+    function parseDate(dateString) {
+        if (!dateString) return new Date();
+
+        // Парсим дату в правильном формате
+        const date = new Date(dateString);
+        return isNaN(date.getTime()) ? new Date() : date;
     }
 
     function loadMachineUtilization() {
@@ -236,15 +527,8 @@
         if (endDate) params.append('endDate', endDate);
 
         fetch(`/Gantt/GetMachineUtilization?${params.toString()}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                console.log('Данные загрузки станков:', data);
-
                 const dataTable = new google.visualization.DataTable();
                 dataTable.addColumn('string', 'Станок');
                 dataTable.addColumn('number', 'Производство (ч)');
@@ -266,32 +550,264 @@
                     vAxis: { title: 'Станки' },
                     isStacked: true,
                     series: {
-                        0: { color: '#28a745' },  // Производство - зеленый
-                        1: { color: '#ffc107' }   // Переналадка - желтый
+                        0: { color: '#28a745' },
+                        1: { color: '#ffc107' }
                     },
                     backgroundColor: 'white'
                 };
 
-                // ИСПРАВЛЕНИЕ: используем правильный конструктор
-                const chart = new google.visualization.ColumnChart(document.getElementById('utilization_chart'));
+                const chart = new google.visualization.BarChart(document.getElementById('utilization_chart'));
                 chart.draw(dataTable, options);
             })
             .catch(error => {
                 console.error('Error loading utilization data:', error);
-                document.getElementById('utilization_chart').innerHTML = `<div class="alert alert-danger">Ошибка загрузки данных о загрузке: ${error.message}</div>`;
+                document.getElementById('utilization_chart').innerHTML =
+                    `<div class="alert alert-danger">Ошибка загрузки данных о загрузке: ${error.message}</div>`;
             });
     }
 
-    function showStageDetails(item) {
-        if (item && item.stageId && item.stageId > 0) {
-            window.open(`/RouteStages/Details/${item.stageId}`, '_blank');
-        } else {
-            console.error('Нет stageId в элементе:', item);
-            alert('Ошибка: не удается открыть детали этапа');
-        }
+    // Автоматическое управление
+    function processAutomaticExecution() {
+        const button = document.getElementById('processAutomation');
+        const status = document.getElementById('automationStatus');
+
+        button.disabled = true;
+        button.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Обработка...';
+
+        fetch('/api/Automation/process', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                status.textContent = 'Автоматика выполнена';
+                status.className = 'badge bg-success ms-3';
+                updateGantt(); // Обновляем диаграмму
+                showToast('Автоматическая обработка выполнена успешно', 'success');
+            } else {
+                status.textContent = 'Ошибка автоматики';
+                status.className = 'badge bg-danger ms-3';
+                showToast('Ошибка: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error processing automation:', error);
+            status.textContent = 'Ошибка связи';
+            status.className = 'badge bg-danger ms-3';
+            showToast('Ошибка связи с сервером', 'error');
+        })
+        .finally(() => {
+            button.disabled = false;
+            button.innerHTML = '<i class="fas fa-play"></i> Запустить автоматику';
+        });
     }
 
-    // Инициализация дат
+    // Управление очередями
+    function showQueueManagement() {
+        fetch('/Gantt/GetMachineQueue/' + document.getElementById('machineFilter').value)
+            .then(response => response.json())
+            .then(data => {
+                let html = `<h6>Очередь для станка: ${data.machine}</h6>`;
+                if (data.queue && data.queue.length > 0) {
+                    html += '<table class="table table-sm">';
+                    html += '<thead><tr><th>Операция</th><th>Деталь</th><th>Прогноз</th><th>Действия</th></tr></thead>';
+                    html += '<tbody>';
+                    data.queue.forEach(item => {
+                        html += `<tr>
+                            <td>${item.name}</td>
+                            <td>${item.detailName}</td>
+                            <td>${item.estimatedStart ? new Date(item.estimatedStart).toLocaleString() : '-'}</td>
+                            <td>
+                                <button class="btn btn-sm btn-danger" onclick="removeFromQueue(${item.id})">
+                                    Убрать из очереди
+                                </button>
+                            </td>
+                        </tr>`;
+                    });
+                    html += '</tbody></table>';
+                } else {
+                    html += '<p class="text-muted">Очередь пуста</p>';
+                }
+
+                document.getElementById('queueContent').innerHTML = html;
+                $('#queueModal').modal('show');
+            })
+            .catch(error => {
+                console.error('Error loading queue:', error);
+                showToast('Ошибка загрузки очереди', 'error');
+            });
+    }
+
+    // Действия с этапом
+    function showStageActions(stageData) {
+        selectedStageId = stageData.stageId;
+
+        fetch(`/Gantt/GetStageInfo/${stageData.stageId}`)
+            .then(response => response.json())
+            .then(data => {
+                let infoHtml = `
+                    <div class="row">
+                        <div class="col-12">
+                            <h6>${data.name}</h6>
+                            <p class="mb-1"><strong>Деталь:</strong> ${data.detailName}</p>
+                            <p class="mb-1"><strong>Станок:</strong> ${data.machineName || 'Не назначен'}</p>
+                            <p class="mb-1"><strong>Статус:</strong>
+                                <span class="badge ${getStatusBadgeClass(data.status)}">${data.status}</span>
+                            </p>
+                            <p class="mb-1"><strong>Плановое время:</strong> ${data.plannedTime.toFixed(2)} ч</p>
+                            ${data.estimatedStart ? `<p class="mb-1"><strong>Прогноз начала:</strong> ${new Date(data.estimatedStart).toLocaleString()}</p>` : ''}
+                        </div>
+                    </div>
+                `;
+
+                let actionsHtml = '';
+
+                if (data.canReleaseMachine) {
+                    actionsHtml += `
+                        <button class="btn btn-warning me-2" onclick="releaseMachine(${data.machineId})">
+                            <i class="fas fa-pause"></i> Освободить станок
+                        </button>
+                    `;
+                }
+
+                if (data.canAddToQueue) {
+                    actionsHtml += `
+                        <button class="btn btn-info me-2" onclick="addToQueue(${selectedStageId})">
+                            <i class="fas fa-plus"></i> Добавить в очередь
+                        </button>
+                    `;
+                }
+
+                if (data.canRemoveFromQueue) {
+                    actionsHtml += `
+                        <button class="btn btn-secondary me-2" onclick="removeFromQueue(${selectedStageId})">
+                            <i class="fas fa-minus"></i> Убрать из очереди
+                        </button>
+                    `;
+                }
+
+                actionsHtml += `
+                    <a href="/RouteStages/Details/${selectedStageId}" class="btn btn-primary" target="_blank">
+                        <i class="fas fa-external-link-alt"></i> Открыть детали
+                    </a>
+                `;
+
+                document.getElementById('stageInfo').innerHTML = infoHtml;
+                document.getElementById('stageActions').innerHTML = actionsHtml;
+                $('#stageActionModal').modal('show');
+            })
+            .catch(error => {
+                console.error('Error loading stage info:', error);
+                showToast('Ошибка загрузки информации об этапе', 'error');
+            });
+    }
+
+    // Функции управления этапами
+    function addToQueue(stageId) {
+        fetch(`/Gantt/AddStageToQueue/${stageId}`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Этап добавлен в очередь', 'success');
+                    updateGantt();
+                    $('#stageActionModal').modal('hide');
+                } else {
+                    showToast('Ошибка: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error adding to queue:', error);
+                showToast('Ошибка добавления в очередь', 'error');
+            });
+    }
+
+    function removeFromQueue(stageId) {
+        fetch(`/Gantt/RemoveStageFromQueue/${stageId}`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Этап убран из очереди', 'success');
+                    updateGantt();
+                    $('#stageActionModal').modal('hide');
+                    $('#queueModal').modal('hide');
+                } else {
+                    showToast('Ошибка: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error removing from queue:', error);
+                showToast('Ошибка удаления из очереди', 'error');
+            });
+    }
+
+    function releaseMachine(machineId) {
+        const reason = prompt('Укажите причину освобождения станка:');
+        if (!reason) return;
+
+        fetch('/Gantt/ReleaseMachine', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+            },
+            body: JSON.stringify({
+                machineId: machineId,
+                urgentStageId: selectedStageId,
+                reason: reason
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Станок освобожден', 'success');
+                updateGantt();
+                $('#stageActionModal').modal('hide');
+            } else {
+                showToast('Ошибка: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error releasing machine:', error);
+            showToast('Ошибка освобождения станка', 'error');
+        });
+    }
+
+    // Вспомогательные функции
+    function getStatusBadgeClass(status) {
+        const statusClasses = {
+            'Pending': 'bg-secondary',
+            'Ready': 'bg-info',
+            'Waiting': 'bg-warning',
+            'InProgress': 'bg-primary',
+            'Paused': 'bg-warning',
+            'Completed': 'bg-success',
+            'Cancelled': 'bg-danger'
+        };
+        return statusClasses[status] || 'bg-secondary';
+    }
+
+    function showToast(message, type = 'info') {
+        // Простая реализация уведомлений
+        const alertClass = type === 'success' ? 'alert-success' :
+                          type === 'error' ? 'alert-danger' : 'alert-info';
+
+        const toast = $(`
+            <div class="alert ${alertClass} alert-dismissible fade show position-fixed"
+                 style="top: 20px; right: 20px; z-index: 9999;">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `);
+
+        $('body').append(toast);
+        setTimeout(() => toast.remove(), 5000);
+    }
+
+    // Инициализация при загрузке страницы
     document.addEventListener('DOMContentLoaded', function() {
         const today = new Date();
         const oneWeekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);

@@ -1,71 +1,79 @@
-using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using ProductionSystem.Data;
 using ProductionSystem.Services;
-using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddDbContext<ProductionContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
-
+// Добавляем службы
 builder.Services.AddControllersWithViews();
 
-// Регистрируем сервисы
+// Настройка подключения к базе данных
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Host=localhost;Database=ProductionSystemDB;Username=postgres;Password=postgres";
+
+builder.Services.AddDbContext<ProductionContext>(options =>
+    options.UseNpgsql(connectionString,
+        npgsqlOptions => npgsqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
+            errorCodesToAdd: null)));
+
+// Регистрация сервисов
 builder.Services.AddScoped<IStageAssignmentService, StageAssignmentService>();
 builder.Services.AddScoped<IStageAutomationService, StageAutomationService>();
 
-// Регистрируем фоновый сервис
+// Регистрация фонового сервиса автоматизации
 builder.Services.AddHostedService<StageAutomationBackgroundService>();
 
-// Добавляем логирование
-builder.Services.AddLogging();
+// Добавляем поддержку сессий
+builder.Services.AddDistributedMemoryCache();
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
+// Добавляем антифоргери токены
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "RequestVerificationToken";
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Настройка pipeline
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
 
-app.UseExceptionHandler(errorApp =>
-{
-    errorApp.Run(async context =>
-    {
-        context.Response.StatusCode = 500;
-        context.Response.ContentType = "application/json";
-
-        var exceptionHandlerPathFeature = context.Features.Get<IExceptionHandlerPathFeature>();
-        if (exceptionHandlerPathFeature?.Error != null)
-        {
-            var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError(exceptionHandlerPathFeature.Error, "Необработанная ошибка");
-
-            await context.Response.WriteAsync(JsonSerializer.Serialize(new
-            {
-                error = "Произошла внутренняя ошибка сервера",
-                details = context.Request.Headers.ContainsKey("Accept") &&
-                         context.Request.Headers["Accept"].ToString().Contains("application/json")
-                    ? exceptionHandlerPathFeature.Error.Message
-                    : null
-            }));
-        }
-    });
-});
-
-
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
-
+app.UseSession();
 app.UseAuthorization();
 
+// Настройка маршрутизации
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
+
+// Автоматическое применение миграций при запуске
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<ProductionContext>();
+    try
+    {
+        context.Database.Migrate();
+        Console.WriteLine("База данных успешно обновлена");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Ошибка при обновлении базы данных: {ex.Message}");
+    }
+}
 
 app.Run();
