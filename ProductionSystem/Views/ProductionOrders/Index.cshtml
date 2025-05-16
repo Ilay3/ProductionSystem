@@ -1,0 +1,64 @@
+﻿@model IEnumerable<ProductionSystem.Models.ProductionOrder>
+
+@{
+    ViewData["Title"] = "Производственные задания";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h2>@ViewData["Title"]</h2>
+
+        <p>
+            <a asp-action="Create" class="btn btn-primary">Создать задание</a>
+        </p>
+
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Номер</th>
+                    <th>Деталь</th>
+                    <th>Количество</th>
+                    <th>Статус</th>
+                    <th>Подпартий</th>
+                    <th>Создано</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td>@item.Number</td>
+                        <td>@item.Detail.Name</td>
+                        <td>@item.TotalQuantity</td>
+                        <td>
+                            <span class="badge @(item.Status == "Completed" ? "bg-success" : item.Status == "InProgress" ? "bg-primary" : "bg-secondary")">
+                                @item.Status
+                            </span>
+                        </td>
+                        <td>@item.SubBatches.Count</td>
+                        <td>@item.CreatedAt.ToString("dd.MM.yyyy HH:mm")</td>
+                        <td>
+                            <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-sm btn-info">Подробно</a>
+                            @if (item.Status == "Created")
+                            {
+                                <form asp-action="StartOrder" method="post" style="display:inline;">
+                                    <input type="hidden" name="id" value="@item.Id" />
+                                    <button type="submit" class="btn btn-sm btn-success">Запустить</button>
+                                </form>
+                            }
+                            @if (item.Status == "InProgress")
+                            {
+                                <form asp-action="CompleteOrder" method="post" style="display:inline;">
+                                    <input type="hidden" name="id" value="@item.Id" />
+                                    <button type="submit" class="btn btn-sm btn-warning">Завершить</button>
+                                </form>
+                            }
+                            <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-danger">Удалить</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

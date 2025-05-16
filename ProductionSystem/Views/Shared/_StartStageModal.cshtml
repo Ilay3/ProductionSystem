@@ -1,0 +1,26 @@
+﻿@model int
+
+<!-- Modal для запуска этапа -->
+<div class="modal fade" id="startStageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-controller="StageExecution" asp-action="StartStage" method="post">
+                <input type="hidden" name="id" value="@Model" />
+                <div class="modal-header">
+                    <h5 class="modal-title">Запуск этапа</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="operator">Оператор</label>
+                        <input name="operator" type="text" class="form-control" placeholder="Имя оператора" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-success">Запустить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,45 @@
+﻿@model ProductionSystem.Models.Operation
+
+@{
+    ViewData["Title"] = "Детали операции";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<div class="row">
+    <div class="col-md-8">
+        <dl class="row">
+            <dt class="col-sm-3">Деталь</dt>
+            <dd class="col-sm-9">@Model.Detail.Name</dd>
+
+            <dt class="col-sm-3">Номер операции</dt>
+            <dd class="col-sm-9">@Model.OperationNumber</dd>
+
+            <dt class="col-sm-3">Название</dt>
+            <dd class="col-sm-9">@Model.Name</dd>
+
+            <dt class="col-sm-3">Тип станка</dt>
+            <dd class="col-sm-9">@Model.MachineType.Name</dd>
+
+            <dt class="col-sm-3">Время на 1 деталь</dt>
+            <dd class="col-sm-9">@Model.TimePerPiece.ToString("F3") ч</dd>
+
+            <dt class="col-sm-3">Порядок</dt>
+            <dd class="col-sm-9">@Model.Order</dd>
+
+            @if (!string.IsNullOrEmpty(Model.Description))
+            {
+                <dt class="col-sm-3">Описание</dt>
+                <dd class="col-sm-9">@Model.Description</dd>
+            }
+
+            <dt class="col-sm-3">Создано</dt>
+            <dd class="col-sm-9">@Model.CreatedAt.ToString("dd.MM.yyyy HH:mm")</dd>
+        </dl>
+
+        <div>
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Редактировать</a>
+            <a asp-action="Index" asp-route-detailId="@Model.DetailId" class="btn btn-secondary">Назад к списку</a>
+        </div>
+    </div>
+</div>

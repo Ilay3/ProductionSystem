@@ -1,0 +1,52 @@
+﻿@model IEnumerable<ProductionSystem.Models.Operation>
+
+@{
+    ViewData["Title"] = "Операции";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h2>@ViewData["Title"]</h2>
+
+        @if (!string.IsNullOrEmpty(ViewBag.DetailName))
+        {
+            <h4>Деталь: @ViewBag.DetailName</h4>
+        }
+
+        <p>
+            <a asp-action="Create" class="btn btn-primary">Создать новую операцию</a>
+        </p>
+
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Деталь</th>
+                    <th>@Html.DisplayNameFor(model => model.OperationNumber)</th>
+                    <th>@Html.DisplayNameFor(model => model.Name)</th>
+                    <th>Тип станка</th>
+                    <th>@Html.DisplayNameFor(model => model.TimePerPiece)</th>
+                    <th>@Html.DisplayNameFor(model => model.Order)</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td>@item.Detail.Name</td>
+                        <td>@Html.DisplayFor(modelItem => item.OperationNumber)</td>
+                        <td>@Html.DisplayFor(modelItem => item.Name)</td>
+                        <td>@item.MachineType.Name</td>
+                        <td>@item.TimePerPiece.ToString("F3") ч</td>
+                        <td>@Html.DisplayFor(modelItem => item.Order)</td>
+                        <td>
+                            <a asp-action="Edit" asp-route-id="@item.Id" class="btn btn-sm btn-primary">Редактировать</a>
+                            <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-sm btn-info">Подробно</a>
+                            <a asp-action="Delete" asp-route-id="@item.Id" class="btn btn-sm btn-danger">Удалить</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

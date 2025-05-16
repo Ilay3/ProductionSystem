@@ -1,0 +1,92 @@
+﻿@model ProductionSystem.Models.StageExecution
+
+@{
+    ViewData["Title"] = "Редактирование фактического времени";
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <h2>@ViewData["Title"]</h2>
+
+        <div class="card">
+            <div class="card-header">
+                <h5>Информация об этапе</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Деталь:</strong> @Model.RouteStage.SubBatch.ProductionOrder.Detail.Name</p>
+                <p><strong>Подпартия:</strong> @Model.RouteStage.SubBatch.BatchNumber</p>
+                <p><strong>Операция:</strong> @Model.RouteStage.Name</p>
+                <p><strong>Станок:</strong> @Model.Machine?.Name</p>
+                <p><strong>Оператор:</strong> @Model.Operator</p>
+                <p><strong>Плановое время:</strong> @Model.RouteStage.PlannedTime.ToString("F2") ч</p>
+                <p>
+                    <strong>Период выполнения:</strong>
+                    @Model.StartedAt?.ToString("dd.MM.yyyy HH:mm") - @Model.CompletedAt?.ToString("dd.MM.yyyy HH:mm")
+                </p>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5>Корректировка фактического времени</h5>
+            </div>
+            <div class="card-body">
+                <form asp-action="UpdateActualTime" method="post">
+                    <input type="hidden" name="id" value="@Model.Id" />
+
+                    <div class="alert alert-info">
+                        <strong>Текущее фактическое время:</strong> @Model.ActualTime?.ToString("F2") ч
+                        @if (Model.ActualTime > Model.RouteStage.PlannedTime)
+                        {
+                            var actualTime = Model.ActualTime ?? 0;
+                            var plannedTime = Model.RouteStage.PlannedTime;
+                            var exceededTime = actualTime - plannedTime;
+
+                            <span class="text-danger">(превышение: @exceededTime.ToString("F2") ч)</span>
+                        }
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="actualTime">Новое фактическое время (часы)</label>
+                                <input type="number" name="actualTime" class="form-control"
+                                       step="0.01" min="0.01" value="@Model.ActualTime" required />
+                                <small class="form-text text-muted">
+                                    Введите скорректированное время выполнения операции
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-group">
+                                <label for="reason">Причина корректировки</label>
+                                <input type="text" name="reason" class="form-control"
+                                       placeholder="Например: Учет простоя, ошибка оператора, корректировка времени..." required />
+                                <small class="form-text text-muted">
+                                    Укажите причину изменения фактического времени
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group mt-3">
+                        <button type="submit" class="btn btn-warning">Сохранить изменения</button>
+                        <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-secondary">Отмена</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Model.Notes))
+        {
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5>История изменений</h5>
+                </div>
+                <div class="card-body">
+                    <pre style="white-space: pre-line; font-family: inherit;">@Model.Notes</pre>
+                </div>
+            </div>
+        }
+    </div>
+</div>

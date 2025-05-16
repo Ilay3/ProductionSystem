@@ -1,0 +1,235 @@
+﻿@model ProductionSystem.Models.StageExecution
+
+@{
+    ViewData["Title"] = "Выполнение этапа";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h2>@ViewData["Title"]</h2>
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Информация об этапе</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Деталь:</strong> @Model.RouteStage.SubBatch.ProductionOrder.Detail.Name</p>
+                        <p><strong>Задание:</strong> @Model.RouteStage.SubBatch.ProductionOrder.Number</p>
+                        <p><strong>Подпартия:</strong> @Model.RouteStage.SubBatch.BatchNumber</p>
+                        <p><strong>Операция:</strong> @Model.RouteStage.StageNumber - @Model.RouteStage.Name</p>
+                        <p><strong>Станок:</strong> @Model.Machine?.Name</p>
+                        <p><strong>Количество:</strong> @Model.RouteStage.Quantity</p>
+                        <p><strong>Оператор:</strong> @(Model.Operator ?? "Не указан")</p>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5>Время выполнения</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Плановое время:</strong> @Model.RouteStage.PlannedTime.ToString("F2") ч</p>
+                        @if (Model.StartedAt.HasValue)
+                        {
+                            <p><strong>Начато:</strong> @Model.StartedAt.Value.ToString("dd.MM.yyyy HH:mm:ss")</p>
+                        }
+                        @if (Model.CompletedAt.HasValue)
+                        {
+                            <p><strong>Завершено:</strong> @Model.CompletedAt.Value.ToString("dd.MM.yyyy HH:mm:ss")</p>
+                            <p>
+                                <strong>Фактическое время:</strong>
+                                @{
+                                    var actualTime = Model.ActualTime ?? 0;
+                                    var plannedTime = Model.RouteStage.PlannedTime;
+                                    var isExceeded = actualTime > plannedTime;
+                                    var exceededTime = actualTime - plannedTime;
+                                }
+                                @if (isExceeded)
+                                {
+                                    <span class="text-danger">@actualTime.ToString("F2") ч</span>
+                                    <small class="text-muted">(план: @plannedTime.ToString("F2") ч, превышение: @exceededTime.ToString("F2") ч)</small>
+                                }
+                                else
+                                {
+                                    <span class="text-success">@actualTime.ToString("F2") ч</span>
+                                    <small class="text-muted">(план: @plannedTime.ToString("F2") ч)</small>
+                                }
+                            </p>
+                            @if (!string.IsNullOrEmpty(Model.TimeExceededReason))
+                            {
+                                <p><strong>Причина превышения:</strong> <span class="text-warning">@Model.TimeExceededReason</span></p>
+                            }
+                        }
+                        else if (ViewBag.CurrentTime != null)
+                        {
+                            <p><strong>Текущее время:</strong> @((double)ViewBag.CurrentTime).ToString("F2") ч</p>
+                        }
+                        @if (Model.PauseTime.HasValue && Model.PauseTime > 0)
+                        {
+                            <p><strong>Время пауз:</strong> @Model.PauseTime.Value.ToString("F2") ч</p>
+                        }
+                        @if (!string.IsNullOrEmpty(Model.Notes))
+                        {
+                            <p><strong>Заметки:</strong> @Model.Notes</p>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Управление</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>
+                            <strong>Текущий статус:</strong>
+                            <span class="badge @(GetStatusBadgeClass(Model.Status))">@Model.Status</span>
+                        </p>
+
+                        @if (Model.Status == "Started")
+                        {
+                            <form asp-action="PauseStage" method="post" style="margin-bottom: 10px;">
+                                <input type="hidden" name="id" value="@Model.Id" />
+                                <button type="submit" class="btn btn-warning btn-block">Пауза</button>
+                            </form>
+
+                            <button type="button" class="btn btn-success btn-block" data-bs-toggle="modal" data-bs-target="#completeModal">
+                                Завершить
+                            </button>
+                        }
+                        else if (Model.Status == "Paused")
+                        {
+                            <form asp-action="ResumeStage" method="post" style="margin-bottom: 10px;">
+                                <input type="hidden" name="id" value="@Model.Id" />
+                                <button type="submit" class="btn btn-primary btn-block">Возобновить</button>
+                            </form>
+
+                            <button type="button" class="btn btn-success btn-block" data-bs-toggle="modal" data-bs-target="#completeModal">
+                                Завершить
+                            </button>
+                        }
+                        else if (Model.Status == "Completed")
+                        {
+                            <div class="alert alert-success" role="alert">
+                                Этап завершен
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5>История выполнения</h5>
+            </div>
+            <div class="card-body">
+                @if (Model.ExecutionLogs.Any())
+                {
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Время</th>
+                                <th>Действие</th>
+                                <th>Оператор</th>
+                                <th>Заметки</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in Model.ExecutionLogs.OrderByDescending(l => l.Timestamp))
+                            {
+                                <tr>
+                                    <td>@log.Timestamp.ToString("dd.MM.yyyy HH:mm:ss")</td>
+                                    <td>@log.Action</td>
+                                    <td>@log.Operator</td>
+                                    <td>@log.Notes</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else
+                {
+                    <p>История пуста</p>
+                }
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <a asp-action="Index" asp-controller="RouteStages" asp-route-subBatchId="@Model.RouteStage.SubBatchId" class="btn btn-secondary">
+                Назад к маршруту
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Modal для завершения -->
+<div class="modal fade" id="completeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-action="CompleteStage" method="post">
+                <input type="hidden" name="id" value="@Model.Id" />
+                <div class="modal-header">
+                    <h5 class="modal-title">Завершение этапа</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="notes">Заметки (необязательно)</label>
+                        <textarea name="notes" class="form-control" rows="3" placeholder="Комментарии к выполнению..."></textarea>
+                    </div>
+
+                    @if (ViewBag.CurrentTime != null && (double)ViewBag.CurrentTime > (double)Model.RouteStage.PlannedTime)
+                    {
+                        var currentTime = (double)ViewBag.CurrentTime;
+                        var plannedTime = (double)Model.RouteStage.PlannedTime;
+                        var exceededTime = currentTime - plannedTime;
+
+                        <div class="alert alert-warning mt-3">
+                            <strong>Превышение планового времени!</strong><br>
+                            Плановое: @plannedTime.ToString("F2") ч<br>
+                            Текущее: @currentTime.ToString("F2") ч<br>
+                            Превышение: @exceededTime.ToString("F2") ч
+                        </div>
+
+                        <div class="form-group">
+                            <label for="timeExceededReason">Причина превышения времени</label>
+                            <select name="timeExceededReason" class="form-control" required>
+                                <option value="">-- Выберите причину --</option>
+                                <option value="Сложность обработки">Сложность обработки</option>
+                                <option value="Износ инструмента">Износ инструмента</option>
+                                <option value="Проблемы с материалом">Проблемы с материалом</option>
+                                <option value="Неисправность станка">Неисправность станка</option>
+                                <option value="Недостаток опыта оператора">Недостаток опыта оператора</option>
+                                <option value="Изменение технологии">Изменение технологии</option>
+                                <option value="Другое">Другое</option>
+                            </select>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-success">Завершить этап</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@functions {
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Pending" => "bg-secondary",
+            "Started" => "bg-primary",
+            "Paused" => "bg-warning",
+            "Completed" => "bg-success",
+            "Cancelled" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+}

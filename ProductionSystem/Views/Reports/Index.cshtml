@@ -1,0 +1,75 @@
+﻿@{
+    ViewData["Title"] = "Отчеты";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h2>@ViewData["Title"]</h2>
+
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Сводка производства</h5>
+                        <p class="card-text">Общая информация о выполненных операциях и времени</p>
+                        <a asp-action="ProductionSummary" class="btn btn-primary">Открыть</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Анализ переналадок</h5>
+                        <p class="card-text">Детальный анализ времени и частоты переналадок</p>
+                        <a asp-action="ChangeoverAnalysis" class="btn btn-primary">Открыть</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Эффективность станков</h5>
+                        <p class="card-text">Анализ эффективности работы оборудования</p>
+                        <a asp-action="MachineEfficiency" class="btn btn-primary">Открыть</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Экспорт данных</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="get" asp-action="ExportProductionData">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="startDate">Дата начала</label>
+                                    <input type="date" name="startDate" class="form-control" value="@DateTime.Today.AddDays(-30).ToString("yyyy-MM-dd")" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="endDate">Дата окончания</label>
+                                    <input type="date" name="endDate" class="form-control" value="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="format">Формат</label>
+                                    <select name="format" class="form-control">
+                                        <option value="csv">CSV</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label>&nbsp;</label>
+                                    <button type="submit" class="btn btn-success btn-block">Экспорт</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

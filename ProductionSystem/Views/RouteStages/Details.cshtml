@@ -1,0 +1,285 @@
+﻿@model ProductionSystem.Models.RouteStage
+
+@{
+    ViewData["Title"] = "Детали этапа";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h2>@ViewData["Title"]</h2>
+
+        @if (TempData["Message"] != null)
+        {
+            <div class="alert alert-success">@TempData["Message"]</div>
+        }
+
+        @if (TempData["Error"] != null)
+        {
+            <div class="alert alert-danger">@TempData["Error"]</div>
+        }
+
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Информация об этапе</h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row">
+                            <dt class="col-sm-3">Деталь</dt>
+                            <dd class="col-sm-9">@Model.SubBatch.ProductionOrder.Detail.Name</dd>
+
+                            <dt class="col-sm-3">Задание</dt>
+                            <dd class="col-sm-9">@Model.SubBatch.ProductionOrder.Number</dd>
+
+                            <dt class="col-sm-3">Подпартия</dt>
+                            <dd class="col-sm-9">@Model.SubBatch.BatchNumber</dd>
+
+                            <dt class="col-sm-3">Номер этапа</dt>
+                            <dd class="col-sm-9">@Model.StageNumber</dd>
+
+                            <dt class="col-sm-3">Название</dt>
+                            <dd class="col-sm-9">@Model.Name</dd>
+
+                            <dt class="col-sm-3">Тип</dt>
+                            <dd class="col-sm-9">
+                                @if (Model.StageType == "Changeover")
+                                {
+                                    <span class="badge bg-warning">Переналадка</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-info">Операция</span>
+                                }
+                            </dd>
+
+                            @if (Model.Operation != null)
+                            {
+                                <dt class="col-sm-3">Операция</dt>
+                                <dd class="col-sm-9">@Model.Operation.Name</dd>
+                            }
+
+                            @if (Model.Machine != null)
+                            {
+                                <dt class="col-sm-3">Станок</dt>
+                                <dd class="col-sm-9">@Model.Machine.Name (@Model.Machine.MachineType.Name)</dd>
+                            }
+
+                            <dt class="col-sm-3">Количество</dt>
+                            <dd class="col-sm-9">@Model.Quantity</dd>
+
+                            <dt class="col-sm-3">Плановое время</dt>
+                            <dd class="col-sm-9">@Model.PlannedTime.ToString("F2") ч</dd>
+
+                            <dt class="col-sm-3">Порядок</dt>
+                            <dd class="col-sm-9">@Model.Order</dd>
+
+                            <dt class="col-sm-3">Статус</dt>
+                            <dd class="col-sm-9">
+                                <span class="badge @(GetStatusBadgeClass(Model.Status))">@Model.Status</span>
+                            </dd>
+
+                            @if (Model.PlannedStartDate.HasValue)
+                            {
+                                <dt class="col-sm-3">Плановое начало</dt>
+                                <dd class="col-sm-9">@Model.PlannedStartDate.Value.ToString("dd.MM.yyyy HH:mm")</dd>
+                            }
+
+                            @if (Model.PlannedEndDate.HasValue)
+                            {
+                                <dt class="col-sm-3">Плановое окончание</dt>
+                                <dd class="col-sm-9">@Model.PlannedEndDate.Value.ToString("dd.MM.yyyy HH:mm")</dd>
+                            }
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- Форма для корректировки времени -->
+                @if (Model.Status == "Pending" || Model.Status == "Ready")
+                {
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5>Корректировка планового времени</h5>
+                        </div>
+                        <div class="card-body">
+                            <form asp-action="UpdatePlannedTime" method="post">
+                                <input type="hidden" name="id" value="@Model.Id" />
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="plannedTime">Плановое время (часы)</label>
+                                            <input type="number" name="plannedTime" class="form-control" step="0.01" value="@Model.PlannedTime" />
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label>&nbsp;</label>
+                                        <button type="submit" class="btn btn-primary btn-block">Обновить время</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                }
+
+                <!-- История выполнения -->
+                @if (Model.StageExecutions.Any())
+                {
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5>История выполнения</h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Статус</th>
+                                        <th>Время начала</th>
+                                        <th>Время завершения</th>
+                                        <th>Фактическое время</th>
+                                        <th>Оператор</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var execution in Model.StageExecutions.OrderByDescending(se => se.CreatedAt))
+                                    {
+                                        <tr>
+                                            <td>
+                                                <span class="badge @(GetExecutionStatusBadgeClass(execution.Status))">
+                                                    @execution.Status
+                                                </span>
+                                            </td>
+                                            <td>@(execution.StartedAt?.ToString("dd.MM.yyyy HH:mm"))</td>
+                                            <td>@(execution.CompletedAt?.ToString("dd.MM.yyyy HH:mm"))</td>
+                                            <td>
+                                                @(execution.ActualTime?.ToString("F2") ?? "-") ч
+                                                @if (execution.ActualTime.HasValue && execution.ActualTime > execution.RouteStage.PlannedTime)
+                                                {
+                                                    var exceededTime = execution.ActualTime.Value - execution.RouteStage.PlannedTime;
+                                                    <span class="text-danger">
+                                                        (+@exceededTime.ToString("F2"))
+                                                    </span>
+                                                }
+                                            </td>
+                                            <td>@execution.Operator</td>
+                                            <td>
+                                                <a asp-controller="StageExecution" asp-action="Details" asp-route-id="@execution.Id" class="btn btn-sm btn-info">
+                                                    Подробно
+                                                </a>
+                                                @if (execution.Status == "Completed")
+                                                {
+                                                    <a asp-controller="StageExecution" asp-action="EditTime" asp-route-id="@execution.Id" class="btn btn-sm btn-warning">
+                                                        Ред. время
+                                                    </a>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Управление</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (Model.MachineId == null && Model.StageType == "Operation")
+                        {
+                            <a asp-action="AssignMachine" asp-route-id="@Model.Id" class="btn btn-primary btn-block">
+                                Назначить станок
+                            </a>
+                        }
+
+                        @if (Model.Status == "Ready")
+                        {
+                            <button type="button" class="btn btn-success btn-block"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#startStageModal"
+                                    onclick="setStageId(@Model.Id)">
+                                Запустить этап
+                            </button>
+                        }
+
+                        @if (Model.Status == "Pending")
+                        {
+                            <form asp-action="UpdateStatus" method="post">
+                                <input type="hidden" name="id" value="@Model.Id" />
+                                <input type="hidden" name="status" value="Ready" />
+                                <button type="submit" class="btn btn-info btn-block">Пометить готовым</button>
+                            </form>
+                        }
+
+                        <a asp-action="Index" asp-route-subBatchId="@Model.SubBatchId" class="btn btn-secondary btn-block mt-2">
+                            Назад к маршруту
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal для запуска этапа -->
+<div class="modal fade" id="startStageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-controller="StageExecution" asp-action="StartStage" method="post">
+                <input type="hidden" name="id" id="stageId" />
+                <div class="modal-header">
+                    <h5 class="modal-title">Запуск этапа</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="operator">Оператор</label>
+                        <input name="operator" type="text" class="form-control" placeholder="Имя оператора" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-success">Запустить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function setStageId(id) {
+        document.getElementById('stageId').value = id;
+    }
+</script>
+
+@functions {
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Pending" => "bg-secondary",
+            "Ready" => "bg-info",
+            "InProgress" => "bg-primary",
+            "Paused" => "bg-warning",
+            "Completed" => "bg-success",
+            "Cancelled" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetExecutionStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Pending" => "bg-secondary",
+            "Started" => "bg-primary",
+            "Paused" => "bg-warning",
+            "Completed" => "bg-success",
+            "Cancelled" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+}

@@ -1,0 +1,64 @@
+﻿@model ProductionSystem.Models.Machine
+
+@{
+    ViewData["Title"] = "Создание станка";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+
+<div class="row">
+    <div class="col-md-6">
+        <form asp-action="Create" method="post">
+            <div asp-validation-summary="All" class="text-danger"></div>
+
+            <div class="form-group">
+                <label asp-for="Name" class="control-label">Название</label>
+                <input asp-for="Name" class="form-control" required />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="InventoryNumber" class="control-label">Инвентарный номер</label>
+                <input asp-for="InventoryNumber" class="form-control" required />
+                <span asp-validation-for="InventoryNumber" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="MachineTypeId" class="control-label">Тип станка</label>
+                <select asp-for="MachineTypeId" class="form-control" asp-items="ViewBag.MachineTypeId" required>
+                    <option value="">-- Выберите тип станка --</option>
+                </select>
+                <span asp-validation-for="MachineTypeId" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Priority" class="control-label">Приоритет</label>
+                <input asp-for="Priority" class="form-control" type="number" min="1" value="1" required />
+                <small class="form-text text-muted">1 - высший приоритет, 2 - второй и т.д. Станки с меньшим числом выбираются первыми.</small>
+                <span asp-validation-for="Priority" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Description" class="control-label">Описание</label>
+                <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <input type="submit" value="Создать" class="btn btn-primary" />
+                <a asp-action="Index" class="btn btn-secondary">Назад к списку</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

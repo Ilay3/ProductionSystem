@@ -1,0 +1,40 @@
+﻿@model ProductionSystem.Models.Machine
+
+@{
+    ViewData["Title"] = "Детали станка";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<div class="row">
+    <div class="col-md-8">
+        <dl class="row">
+            <dt class="col-sm-3">Название</dt>
+            <dd class="col-sm-9">@Model.Name</dd>
+
+            <dt class="col-sm-3">Инвентарный номер</dt>
+            <dd class="col-sm-9">@Model.InventoryNumber</dd>
+
+            <dt class="col-sm-3">Тип станка</dt>
+            <dd class="col-sm-9">@Model.MachineType.Name</dd>
+
+            <dt class="col-sm-3">Приоритет</dt>
+            <dd class="col-sm-9">@Model.Priority</dd>
+
+            @if (!string.IsNullOrEmpty(Model.Description))
+            {
+                <dt class="col-sm-3">Описание</dt>
+                <dd class="col-sm-9">@Model.Description</dd>
+            }
+
+            <dt class="col-sm-3">Создан</dt>
+            <dd class="col-sm-9">@Model.CreatedAt.ToString("dd.MM.yyyy HH:mm")</dd>
+        </dl>
+
+        <div>
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Редактировать</a>
+            <a asp-action="Index" class="btn btn-secondary">Назад к списку</a>
+            <a asp-controller="Gantt" asp-action="Index" asp-route-machineId="@Model.Id" class="btn btn-info">Диаграмма Ганта</a>
+        </div>
+    </div>
+</div>

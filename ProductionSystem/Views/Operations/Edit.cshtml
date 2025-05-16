@@ -1,0 +1,74 @@
+﻿@model ProductionSystem.Models.Operation
+
+@{
+    ViewData["Title"] = "Редактирование операции";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <form asp-action="Edit">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <input type="hidden" asp-for="Id" />
+
+            <div class="form-group">
+                <label asp-for="DetailId" class="control-label">Деталь</label>
+                <select asp-for="DetailId" class="form-control" asp-items="ViewBag.DetailId">
+                    <option value="">-- Выберите деталь --</option>
+                </select>
+                <span asp-validation-for="DetailId" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="OperationNumber" class="control-label">Номер операции</label>
+                <input asp-for="OperationNumber" class="form-control" />
+                <span asp-validation-for="OperationNumber" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Name" class="control-label">Название</label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="MachineTypeId" class="control-label">Тип станка</label>
+                <select asp-for="MachineTypeId" class="form-control" asp-items="ViewBag.MachineTypeId">
+                    <option value="">-- Выберите тип станка --</option>
+                </select>
+                <span asp-validation-for="MachineTypeId" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="TimePerPiece" class="control-label">Время на 1 деталь (ч)</label>
+                <input asp-for="TimePerPiece" class="form-control" type="number" step="0.001" />
+                <span asp-validation-for="TimePerPiece" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Order" class="control-label">Порядок</label>
+                <input asp-for="Order" class="form-control" type="number" />
+                <span asp-validation-for="Order" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Description" class="control-label">Описание</label>
+                <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <input type="submit" value="Сохранить" class="btn btn-primary" />
+                <a asp-action="Index" asp-route-detailId="@Model.DetailId" class="btn btn-secondary">Назад к списку</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

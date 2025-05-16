@@ -1,0 +1,191 @@
+﻿@{
+    ViewData["Title"] = "Расписание станков";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h2>@ViewData["Title"]</h2>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5>Фильтры</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <label for="machineSelect">Станок</label>
+                        <select id="machineSelect" class="form-control">
+                            @foreach (var machine in ViewBag.Machines)
+                            {
+                                <option value="@machine.Id">@machine.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="scheduleStartDate">Дата начала</label>
+                        <input type="date" id="scheduleStartDate" class="form-control" />
+                    </div>
+                    <div class="col-md-3">
+                        <label for="scheduleEndDate">Дата окончания</label>
+                        <input type="date" id="scheduleEndDate" class="form-control" />
+                    </div>
+                    <div class="col-md-2">
+                        <label>&nbsp;</label>
+                        <button type="button" class="btn btn-primary btn-block" onclick="updateMachineSchedule()">
+                            Обновить
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <div id="machine_schedule_chart" style="height: 500px; width: 100%;"></div>
+            </div>
+        </div>
+
+        <!-- Статистика -->
+        <div class="row mt-3">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Общая загрузка</h5>
+                        <h3 id="totalUtilization" class="text-primary">0%</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Время переналадок</h5>
+                        <h3 id="changeoverTime" class="text-warning">0 ч</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Производительное время</h5>
+                        <h3 id="productionTime" class="text-success">0 ч</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    google.charts.load('current', { 'packages': ['timeline'] });
+    google.charts.setOnLoadCallback(function() {
+        updateMachineSchedule();
+    });
+
+    function updateMachineSchedule() {
+        const machineId = document.getElementById('machineSelect').value;
+        const startDate = document.getElementById('scheduleStartDate').value;
+        const endDate = document.getElementById('scheduleEndDate').value;
+
+        if (!machineId) return;
+
+        document.getElementById('machine_schedule_chart').innerHTML = '<div class="text-center"><i class="fa fa-spinner fa-spin fa-3x"></i><p>Загрузка расписания...</p></div>';
+
+        const url = `/Gantt/GetGanttData?machineId=${machineId}&startDate=${startDate}&endDate=${endDate}`;
+
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                const dataTable = new google.visualization.DataTable();
+                dataTable.addColumn({ type: 'string', id: 'Task' });
+                dataTable.addColumn({ type: 'string', id: 'Detail' });
+                dataTable.addColumn({ type: 'string', id: 'style', role: 'style' });
+                dataTable.addColumn({ type: 'date', id: 'Start' });
+                dataTable.addColumn({ type: 'date', id: 'End' });
+
+                data.forEach(item => {
+                    const startDate = item.actualStart ? new Date(item.actualStart) :
+                                     (item.start ? new Date(item.start) : new Date());
+                    const endDate = item.actualEnd ? new Date(item.actualEnd) :
+                                   (item.end ? new Date(item.end) : new Date(startDate.getTime() + item.duration));
+
+                    let color = '#007bff'; // Синий по умолчанию
+                    switch (item.status) {
+                        case 'Ready': color = '#6c757d'; break;
+                        case 'InProgress': color = '#007bff'; break;
+                        case 'Paused': color = '#ffc107'; break;
+                        case 'Completed': color = '#28a745'; break;
+                    }
+
+                    if (item.stageType === 'Changeover') {
+                        color = '#ff6600';
+                    }
+
+                    dataTable.addRow([
+                        item.taskName,
+                        `${item.stageType === 'Changeover' ? 'Переналадка' : 'Операция'}: ${item.taskName}`,
+                        color,
+                        startDate,
+                        endDate
+                    ]);
+                });
+
+                const options = {
+                    timeline: {
+                        showRowLabels: true,
+                        groupByRowLabel: false,
+                        colorByRowLabel: false,
+                        showBarLabels: true,
+                        rowLabelStyle: { fontSize: 12 },
+                        barLabelStyle: { fontSize: 11 }
+                    },
+                    height: 500,
+                    width: '100%'
+                };
+
+                const chart = new google.visualization.Timeline(document.getElementById('machine_schedule_chart'));
+                chart.draw(dataTable, options);
+
+                // Обновляем статистику
+                updateStatistics(data);
+            })
+            .catch(error => {
+                console.error('Error loading machine schedule:', error);
+                document.getElementById('machine_schedule_chart').innerHTML = '<div class="alert alert-danger">Ошибка загрузки данных</div>';
+            });
+    }
+
+    function updateStatistics(data) {
+        let totalTime = 0;
+        let productionTime = 0;
+        let changeoverTime = 0;
+
+        data.forEach(item => {
+            const duration = item.duration / (1000 * 60 * 60); // конвертируем в часы
+            totalTime += duration;
+
+            if (item.stageType === 'Changeover') {
+                changeoverTime += duration;
+            } else {
+                productionTime += duration;
+            }
+        });
+
+        // Предполагаем рабочий день 8 часов
+        const totalAvailableTime = 8 * data.length;
+        const utilization = totalAvailableTime > 0 ? (totalTime / totalAvailableTime * 100) : 0;
+
+        document.getElementById('totalUtilization').textContent = `${utilization.toFixed(1)}%`;
+        document.getElementById('changeoverTime').textContent = `${changeoverTime.toFixed(1)} ч`;
+        document.getElementById('productionTime').textContent = `${productionTime.toFixed(1)} ч`;
+    }
+
+    // Инициализация дат
+    document.addEventListener('DOMContentLoaded', function() {
+        const today = new Date();
+        const oneWeekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const oneWeekLater = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
+
+        document.getElementById('scheduleStartDate').value = oneWeekAgo.toISOString().split('T')[0];
+        document.getElementById('scheduleEndDate').value = oneWeekLater.toISOString().split('T')[0];
+    });
+</script>

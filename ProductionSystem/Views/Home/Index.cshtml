@@ -1,0 +1,94 @@
+﻿@{
+    ViewData["Title"] = "Главная страница";
+}
+
+<div class="text-center">
+    <h1 class="display-4">Система управления производством</h1>
+    <p>Добро пожаловать в систему планирования и контроля производства</p>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-cogs fa-3x text-primary mb-3"></i>
+                <h5 class="card-title">Справочники</h5>
+                <p class="card-text">Управление деталями, станками, операциями и переналадками</p>
+                <a asp-controller="Details" asp-action="Index" class="btn btn-primary">Перейти</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-tasks fa-3x text-success mb-3"></i>
+                <h5 class="card-title">Производство</h5>
+                <p class="card-text">Создание и управление производственными заданиями</p>
+                <a asp-controller="ProductionOrders" asp-action="Index" class="btn btn-success">Перейти</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-chart-gantt fa-3x text-info mb-3"></i>
+                <h5 class="card-title">Диаграмма Ганта</h5>
+                <p class="card-text">Визуализация производственного процесса</p>
+                <a asp-controller="Gantt" asp-action="Index" class="btn btn-info">Перейти</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-chart-line fa-3x text-warning mb-3"></i>
+                <h5 class="card-title">Отчеты</h5>
+                <p class="card-text">Анализ производительности и эффективности</p>
+                <a asp-controller="Reports" asp-action="Index" class="btn btn-warning">Перейти</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="fas fa-database fa-3x text-secondary mb-3"></i>
+                <h5 class="card-title">Тестовые данные</h5>
+                <p class="card-text">Создать образцы данных для демонстрации</p>
+                <button onclick="createSampleData()" class="btn btn-secondary">Создать</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function createSampleData() {
+        if (confirm('Создать тестовые данные? Это действие нельзя отменить.')) {
+            fetch('/SeedData/CreateSampleData', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert('Ошибка: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Произошла ошибка при создании данных');
+            });
+        }
+    }
+</script>

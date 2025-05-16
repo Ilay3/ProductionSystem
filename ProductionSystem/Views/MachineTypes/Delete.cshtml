@@ -1,0 +1,35 @@
+﻿@model ProductionSystem.Models.MachineType
+
+@{
+    ViewData["Title"] = "Удаление типа станка";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<div class="alert alert-warning">
+    <p>Вы уверены, что хотите удалить этот тип станка?</p>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <dl class="row">
+            <dt class="col-sm-3">Название</dt>
+            <dd class="col-sm-9">@Model.Name</dd>
+
+            @if (!string.IsNullOrEmpty(Model.Description))
+            {
+                <dt class="col-sm-3">Описание</dt>
+                <dd class="col-sm-9">@Model.Description</dd>
+            }
+
+            <dt class="col-sm-3">Создан</dt>
+            <dd class="col-sm-9">@Model.CreatedAt.ToString("dd.MM.yyyy HH:mm")</dd>
+        </dl>
+
+        <form asp-action="Delete">
+            <input type="hidden" asp-for="Id" />
+            <button type="submit" class="btn btn-danger">Удалить</button>
+            <a asp-action="Index" class="btn btn-secondary">Отмена</a>
+        </form>
+    </div>
+</div>

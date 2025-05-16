@@ -1,0 +1,47 @@
+﻿@model ProductionSystem.Models.RouteStage
+
+@{
+    ViewData["Title"] = "Назначение станка";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>Информация об операции</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Деталь:</strong> @Model.SubBatch.ProductionOrder.Detail.Name</p>
+                <p><strong>Операция:</strong> @Model.StageNumber - @Model.Name</p>
+                <p><strong>Требуемый тип станка:</strong> @Model.Operation?.MachineType?.Name</p>
+                <p><strong>Количество:</strong> @Model.Quantity шт.</p>
+                <p><strong>Плановое время:</strong> @Model.PlannedTime.ToString("F2") ч</p>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5>Назначение станка</h5>
+            </div>
+            <div class="card-body">
+                <form asp-action="AssignMachine" method="post">
+                    <input type="hidden" asp-for="Id" />
+
+                    <div class="form-group">
+                        <label for="machineId" class="control-label">Станок</label>
+                        <select name="machineId" class="form-control" asp-items="ViewBag.Machines">
+                            <option value="">-- Выберите станок --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group mt-3">
+                        <button type="submit" class="btn btn-primary">Назначить станок</button>
+                        <a asp-action="Index" asp-route-subBatchId="@Model.SubBatchId" class="btn btn-secondary">Отмена</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

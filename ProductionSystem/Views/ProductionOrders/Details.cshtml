@@ -1,0 +1,100 @@
+﻿@model ProductionSystem.Models.ProductionOrder
+
+@{
+    ViewData["Title"] = "Детали задания";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h2>@ViewData["Title"] - @Model.Number</h2>
+
+        <div class="card">
+            <div class="card-header">
+                <h5>Информация о задании</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Деталь:</strong> @Model.Detail.Name</p>
+                <p><strong>Общее количество:</strong> @Model.TotalQuantity</p>
+                <p>
+                    <strong>Статус:</strong>
+                    <span class="badge @(Model.Status == "Completed" ? "bg-success" : Model.Status == "InProgress" ? "bg-primary" : "bg-secondary")">
+                        @Model.Status
+                    </span>
+                </p>
+                <p><strong>Создано:</strong> @Model.CreatedAt.ToString("dd.MM.yyyy HH:mm")</p>
+                @if (Model.StartedAt.HasValue)
+                {
+                    <p><strong>Запущено:</strong> @Model.StartedAt.Value.ToString("dd.MM.yyyy HH:mm")</p>
+                }
+                @if (Model.CompletedAt.HasValue)
+                {
+                    <p><strong>Завершено:</strong> @Model.CompletedAt.Value.ToString("dd.MM.yyyy HH:mm")</p>
+                }
+                @if (!string.IsNullOrEmpty(Model.Description))
+                {
+                    <p><strong>Описание:</strong> @Model.Description</p>
+                }
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <h4>Подпартии</h4>
+
+            @if (Model.SubBatches.Any())
+            {
+                <div class="row">
+                    @foreach (var subBatch in Model.SubBatches.OrderBy(s => s.BatchNumber))
+                    {
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6>Подпартия @subBatch.BatchNumber</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Количество:</strong> @subBatch.Quantity</p>
+                                    <p>
+                                        <strong>Статус:</strong>
+                                        <span class="badge @(subBatch.Status == "Completed" ? "bg-success" : subBatch.Status == "InProgress" ? "bg-primary" : "bg-secondary")">
+                                            @subBatch.Status
+                                        </span>
+                                    </p>
+                                    <p><strong>Этапов в маршруте:</strong> @subBatch.RouteStages.Count</p>
+
+                                    @if (subBatch.RouteStages.Any())
+                                    {
+                                        <h6>Операции:</h6>
+                                        <ul class="list-group list-group-flush">
+                                            @foreach (var stage in subBatch.RouteStages.OrderBy(s => s.Order))
+                                            {
+                                                <li class="list-group-item">
+                                                    <small>
+                                                        @stage.StageNumber - @stage.Name
+                                                        <span class="badge @(stage.Status == "Completed" ? "bg-success" : stage.Status == "InProgress" ? "bg-primary" : "bg-secondary")">
+                                                            @stage.Status
+                                                        </span>
+                                                    </small>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+
+                                    <div class="mt-2">
+                                        <a asp-controller="RouteStages" asp-action="Index" asp-route-subBatchId="@subBatch.Id" class="btn btn-sm btn-info">Маршрут</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p>Подпартии не созданы.</p>
+            }
+        </div>
+
+        <div class="mt-3">
+            <a asp-action="Index" class="btn btn-secondary">Назад к списку</a>
+        </div>
+    </div>
+</div>

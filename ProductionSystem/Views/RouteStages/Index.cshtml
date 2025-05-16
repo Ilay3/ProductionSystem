@@ -1,0 +1,142 @@
+﻿@model IEnumerable<ProductionSystem.Models.RouteStage>
+
+@{
+    ViewData["Title"] = "Маршрут производства";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        @if (ViewBag.SubBatch != null)
+        {
+            <h2>@ViewData["Title"] - Подпартия @ViewBag.SubBatch.BatchNumber</h2>
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5>@ViewBag.SubBatch.ProductionOrder.Detail.Name</h5>
+                    <p><strong>Задание:</strong> @ViewBag.SubBatch.ProductionOrder.Number</p>
+                    <p><strong>Количество:</strong> @ViewBag.SubBatch.Quantity шт.</p>
+                    <p><strong>Статус:</strong> <span class="badge bg-info">@ViewBag.SubBatch.Status</span></p>
+                </div>
+            </div>
+        }
+        else
+        {
+            <h2>@ViewData["Title"]</h2>
+        }
+
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <th>Операция</th>
+                    <th>Тип</th>
+                    <th>Станок</th>
+                    <th>Время план</th>
+                    <th>Количество</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr class="@(item.StageType == "Changeover" ? "table-warning" : "")">
+                        <td>@item.StageNumber</td>
+                        <td>
+                            @item.Name
+                            @if (item.StageType == "Changeover")
+                            {
+                                <span class="badge bg-warning">Переналадка</span>
+                            }
+                        </td>
+                        <td>@item.StageType</td>
+                        <td>
+                            @if (item.Machine != null)
+                            {
+                                <span class="badge bg-success">@item.Machine.Name</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Не назначен</span>
+                            }
+                        </td>
+                        <td>@item.PlannedTime.ToString("F2") ч</td>
+                        <td>@item.Quantity</td>
+                        <td>
+                            <span class="badge @(GetStatusBadgeClass(item.Status))">@item.Status</span>
+                        </td>
+                        <td>
+                            @if (item.MachineId == null && item.StageType == "Operation")
+                            {
+                                <a asp-action="AssignMachine" asp-route-id="@item.Id" class="btn btn-sm btn-primary">Назначить станок</a>
+                            }
+                            <a asp-action="Details" asp-route-id="@item.Id" class="btn btn-sm btn-info">Подробно</a>
+                            @if (item.Status == "Ready")
+                            {
+                                <button type="button" class="btn btn-sm btn-success"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#startStageModal"
+                                        onclick="setStageId(@item.Id)">
+                                    Запустить
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        @if (ViewBag.SubBatch != null)
+        {
+            <a asp-controller="ProductionOrders" asp-action="Details" asp-route-id="@ViewBag.SubBatch.ProductionOrderId" class="btn btn-secondary">
+                Назад к заданию
+            </a>
+        }
+    </div>
+</div>
+
+@functions {
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Pending" => "bg-secondary",
+            "Ready" => "bg-info",
+            "InProgress" => "bg-primary",
+            "Paused" => "bg-warning",
+            "Completed" => "bg-success",
+            "Cancelled" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+}
+
+<!-- Modal для запуска этапа -->
+<div class="modal fade" id="startStageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form asp-controller="StageExecution" asp-action="StartStage" method="post">
+                <input type="hidden" name="id" id="stageId" />
+                <div class="modal-header">
+                    <h5 class="modal-title">Запуск этапа</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="operator">Оператор</label>
+                        <input name="operator" type="text" class="form-control" placeholder="Имя оператора" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-success">Запустить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function setStageId(id) {
+        document.getElementById('stageId').value = id;
+    }
+</script>

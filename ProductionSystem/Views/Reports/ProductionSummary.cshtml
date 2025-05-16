@@ -1,0 +1,120 @@
+﻿@{
+    ViewData["Title"] = "Сводка производства";
+    var summary = ViewBag.Summary;
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h2>@ViewData["Title"]</h2>
+        <p>Период: @summary.DateFrom.ToString("dd.MM.yyyy") - @summary.DateTo.ToString("dd.MM.yyyy")</p>
+
+        <!-- KPI карточки -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-primary">@summary.TotalOperations</h5>
+                        <p class="card-text">Операций выполнено</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-warning">@summary.TotalChangeovers</h5>
+                        <p class="card-text">Переналадок</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-success">@summary.CompletedParts</h5>
+                        <p class="card-text">Деталей изготовлено</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h5 class="card-title text-info">@(((decimal)summary.TotalProductionTime).ToString("F1")) ч</h5>
+                        <p class="card-text">Время производства</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Статистика по станкам -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Статистика по станкам</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Станок</th>
+                            <th>Операции</th>
+                            <th>Переналадки</th>
+                            <th>Время производства (ч)</th>
+                            <th>Время переналадок (ч)</th>
+                            <th>% переналадок</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var stat in summary.MachineStats)
+                        {
+                            var totalTime = stat.ProductionTime + stat.ChangeoverTime;
+                            var changeoverPercent = totalTime > 0 ? (stat.ChangeoverTime / totalTime * 100) : 0;
+
+                            <tr>
+                                <td>@stat.Machine</td>
+                                <td>@stat.Operations</td>
+                                <td>@stat.Changeovers</td>
+                                <td>@stat.ProductionTime.ToString("F1")</td>
+                                <td>@stat.ChangeoverTime.ToString("F1")</td>
+                                <td>@changeoverPercent.ToString("F1")%</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Статистика по деталям -->
+        <div class="card">
+            <div class="card-header">
+                <h5>Статистика по деталям</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Деталь</th>
+                            <th>Количество</th>
+                            <th>Операций</th>
+                            <th>Общее время (ч)</th>
+                            <th>Среднее время на операцию (ч)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var stat in summary.DetailStats)
+                        {
+                            <tr>
+                                <td>@stat.Detail</td>
+                                <td>@stat.Quantity</td>
+                                <td>@stat.Operations</td>
+                                <td>@stat.TotalTime.ToString("F1")</td>
+                                <td>@stat.AverageTime.ToString("F2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <a asp-action="Index" class="btn btn-secondary">Назад к отчетам</a>
+        </div>
+    </div>
+</div>

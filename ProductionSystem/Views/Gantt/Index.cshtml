@@ -1,0 +1,289 @@
+﻿@{
+    ViewData["Title"] = "Диаграмма Ганта";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h2>@ViewData["Title"]</h2>
+
+        <!-- Фильтры -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5>Фильтры</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label for="orderFilter">Производственное задание</label>
+                        <select id="orderFilter" class="form-control">
+                            <option value="">Все задания</option>
+                            @foreach (var order in ViewBag.Orders)
+                            {
+                                @if (ViewBag.SelectedOrderId == order.Id)
+                                {
+                                            <option value="@order.Id" selected>@order.Number - @order.Name</option>
+                                }
+                                else
+                                {
+                                            <option value="@order.Id">@order.Number - @order.Name</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="machineFilter">Станок</label>
+                        <select id="machineFilter" class="form-control">
+                            <option value="">Все станки</option>
+                            @foreach (var machine in ViewBag.Machines)
+                            {
+                                @if (ViewBag.SelectedMachineId == machine.Id)
+                                {
+                                            <option value="@machine.Id" selected>@machine.Name</option>
+                                }
+                                else
+                                {
+                                            <option value="@machine.Id">@machine.Name</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="startDate">Дата начала</label>
+                        <input type="date" id="startDate" class="form-control" />
+                    </div>
+                    <div class="col-md-2">
+                        <label for="endDate">Дата окончания</label>
+                        <input type="date" id="endDate" class="form-control" />
+                    </div>
+                    <div class="col-md-2">
+                        <label>&nbsp;</label>
+                        <button type="button" class="btn btn-primary btn-block" onclick="updateGantt()">
+                            Обновить
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Легенда -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-12">
+                        <strong>Легенда:</strong>
+                        <span class="badge bg-secondary ms-2">Готов к запуску</span>
+                        <span class="badge bg-primary ms-2">В работе</span>
+                        <span class="badge bg-warning ms-2">На паузе</span>
+                        <span class="badge bg-success ms-2">Завершен</span>
+                        <span class="badge bg-warning ms-2" style="background-color: #ffa500 !important;">Переналадка</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Диаграмма -->
+        <div class="card">
+            <div class="card-body">
+                <div id="gantt_chart" style="height: 600px; width: 100%;"></div>
+            </div>
+        </div>
+
+        <!-- Загрузка станков -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5>Загрузка станков</h5>
+            </div>
+            <div class="card-body">
+                <div id="utilization_chart" style="height: 400px; width: 100%;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    google.charts.load('current', { 'packages': ['gantt'] });
+    google.charts.setOnLoadCallback(drawChart);
+
+    function drawChart() {
+        updateGantt();
+    }
+
+    function updateGantt() {
+        const orderId = document.getElementById('orderFilter').value;
+        const machineId = document.getElementById('machineFilter').value;
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+
+        // Показываем индикатор загрузки
+        document.getElementById('gantt_chart').innerHTML = '<div class="text-center"><i class="fa fa-spinner fa-spin fa-3x"></i><p>Загрузка данных...</p></div>';
+
+        fetch(`/Gantt/GetGanttData?orderId=${orderId}&machineId=${machineId}&startDate=${startDate}&endDate=${endDate}`)
+            .then(response => response.json())
+            .then(data => {
+                const dataTable = new google.visualization.DataTable();
+
+                // Определяем колонки
+                dataTable.addColumn('string', 'Task ID');
+                dataTable.addColumn('string', 'Task Name');
+                dataTable.addColumn('string', 'Resource');
+                dataTable.addColumn('date', 'Start Date');
+                dataTable.addColumn('date', 'End Date');
+                dataTable.addColumn('number', 'Duration');
+                dataTable.addColumn('number', 'Percent Complete');
+                dataTable.addColumn('string', 'Dependencies');
+
+                // Добавляем данные
+                data.forEach(item => {
+                    const startDate = item.actualStart ? new Date(item.actualStart) : 
+                                     (item.start ? new Date(item.start) : new Date());
+                    const endDate = item.actualEnd ? new Date(item.actualEnd) : 
+                                   (item.end ? new Date(item.end) : new Date(startDate.getTime() + item.duration));
+
+                    dataTable.addRow([
+                        item.taskId,
+                        item.taskName,
+                        item.resource,
+                        startDate,
+                        endDate,
+                        item.duration,
+                        item.percentComplete,
+                        item.dependencies
+                    ]);
+                });
+
+                const options = {
+                    height: 600,
+                    width: '100%',
+                    gantt: {
+                        trackHeight: 30,
+                        barHeight: 20,
+                        criticalPathEnabled: true,
+                        criticalPathStyle: {
+                            stroke: '#e64a19',
+                            strokeWidth: 5
+                        },
+                        innerGridHorizontalStroke: '#eeeeee',
+                        innerGridVerticalStroke: '#eeeeee',
+                        arrow: {
+                            angle: 100,
+                            length: 8,
+                            spaceAfter: 4
+                        },
+                        labelStyle: {
+                            fontName: 'Arial',
+                            fontSize: 11
+                        }
+                    }
+                };
+
+                const formatter = new google.visualization.TableColorFormat();
+
+                // Раскрашиваем строки по статусу
+                data.forEach((item, index) => {
+                    let color = '#f5f5f5'; // по умолчанию
+
+                    switch (item.status) {
+                        case 'Ready':
+                            color = '#6c757d'; // серый
+                            break;
+                        case 'InProgress':
+                            color = '#007bff'; // синий
+                            break;
+                        case 'Paused':
+                            color = '#ffc107'; // желтый
+                            break;
+                        case 'Completed':
+                            color = '#28a745'; // зеленый
+                            break;
+                    }
+
+                    if (item.stageType === 'Changeover') {
+                        color = '#ff6600'; // оранжевый для переналадки
+                    }
+
+                    formatter.addRange(index, index, 1, 7, 'white', color);
+                });
+
+                formatter.format(dataTable, 1);
+
+                const chart = new google.visualization.Gantt(document.getElementById('gantt_chart'));
+
+                // Добавляем обработчик клика
+                google.visualization.events.addListener(chart, 'select', function () {
+                    const selection = chart.getSelection();
+                    if (selection.length > 0) {
+                        const row = selection[0].row;
+                        const item = data[row];
+                        showStageDetails(item);
+                    }
+                });
+
+                chart.draw(dataTable, options);
+            })
+            .catch(error => {
+                console.error('Error loading Gantt data:', error);
+                document.getElementById('gantt_chart').innerHTML = '<div class="alert alert-danger">Ошибка загрузки данных</div>';
+            });
+
+        // Загружаем данные о загрузке станков
+        loadMachineUtilization();
+    }
+
+    function loadMachineUtilization() {
+        const machineId = document.getElementById('machineFilter').value;
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+
+        fetch(`/Gantt/GetMachineUtilization?machineId=${machineId}&startDate=${startDate}&endDate=${endDate}`)
+            .then(response => response.json())
+            .then(data => {
+                const dataTable = new google.visualization.DataTable();
+                dataTable.addColumn('string', 'Станок');
+                dataTable.addColumn('number', 'Производство (ч)');
+                dataTable.addColumn('number', 'Переналадка (ч)');
+                dataTable.addColumn('number', 'Всего (ч)');
+
+                data.forEach(item => {
+                    dataTable.addRow([
+                        item.machine,
+                        parseFloat(item.productionTime.toFixed(2)),
+                        parseFloat(item.changeoverTime.toFixed(2)),
+                        parseFloat(item.totalTime.toFixed(2))
+                    ]);
+                });
+
+                const options = {
+                    title: 'Загрузка станков (часы)',
+                    chartArea: { width: '80%', height: '80%' },
+                    hAxis: { title: 'Время (часы)', minValue: 0 },
+                    vAxis: { title: 'Станки' },
+                    isStacked: true,
+                    series: {
+                        0: { color: '#28a745' },  // Производство - зеленый
+                        1: { color: '#ffc107' }   // Переналадка - желтый
+                    }
+                };
+
+                const chart = new google.visualization.BarChart(document.getElementById('utilization_chart'));
+                chart.draw(dataTable, options);
+            })
+            .catch(error => {
+                console.error('Error loading utilization data:', error);
+            });
+    }
+
+    function showStageDetails(item) {
+        // Открываем детали этапа в новой вкладке
+        window.open(`/RouteStages/Details/${item.stageId}`, '_blank');
+    }
+
+    // Инициализация дат
+    document.addEventListener('DOMContentLoaded', function() {
+        const today = new Date();
+        const oneWeekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const oneWeekLater = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+        document.getElementById('startDate').value = oneWeekAgo.toISOString().split('T')[0];
+        document.getElementById('endDate').value = oneWeekLater.toISOString().split('T')[0];
+    });
+</script>

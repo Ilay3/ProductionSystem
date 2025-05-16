@@ -1,0 +1,47 @@
+﻿@model ProductionSystem.Models.MachineType
+
+@{
+    ViewData["Title"] = "Детали типа станка";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<div class="row">
+    <div class="col-md-8">
+        <dl class="row">
+            <dt class="col-sm-3">Название</dt>
+            <dd class="col-sm-9">@Model.Name</dd>
+
+            @if (!string.IsNullOrEmpty(Model.Description))
+            {
+                <dt class="col-sm-3">Описание</dt>
+                <dd class="col-sm-9">@Model.Description</dd>
+            }
+
+            <dt class="col-sm-3">Создан</dt>
+            <dd class="col-sm-9">@Model.CreatedAt.ToString("dd.MM.yyyy HH:mm")</dd>
+
+            <dt class="col-sm-3">Станков этого типа</dt>
+            <dd class="col-sm-9">@Model.Machines.Count</dd>
+
+            <dt class="col-sm-3">Операций</dt>
+            <dd class="col-sm-9">@Model.Operations.Count</dd>
+        </dl>
+
+        @if (Model.Machines.Any())
+        {
+            <h4>Станки</h4>
+            <ul>
+                @foreach (var machine in Model.Machines)
+                {
+                    <li>@machine.Name (@machine.InventoryNumber)</li>
+                }
+            </ul>
+        }
+
+        <div>
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Редактировать</a>
+            <a asp-action="Index" class="btn btn-secondary">Назад к списку</a>
+        </div>
+    </div>
+</div>
