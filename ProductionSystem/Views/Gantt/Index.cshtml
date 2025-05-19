@@ -16,7 +16,7 @@
             </div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label for="orderFilter">Производственное задание</label>
                         <select id="orderFilter" class="form-control">
                             <option value="">Все задания</option>
@@ -33,7 +33,7 @@
                             }
                         </select>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label for="machineFilter">Станок</label>
                         <select id="machineFilter" class="form-control">
                             <option value="">Все станки</option>
@@ -59,6 +59,13 @@
                         <input type="date" id="endDate" class="form-control" />
                     </div>
                     <div class="col-md-2">
+                        <label for="hideCompleted">Скрыть завершенные</label>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" id="hideCompleted" @(ViewBag.HideCompleted ? "checked" : "")>
+                            <label class="form-check-label" for="hideCompleted">Скрыть</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
                         <label>&nbsp;</label>
                         <button type="button" class="btn btn-primary btn-block" onclick="updateGantt()">
                             Обновить
@@ -71,13 +78,30 @@
         <!-- Кнопки управления -->
         <div class="card mb-3">
             <div class="card-body">
-                <button id="processAutomation" class="btn btn-success me-2" onclick="processAutomaticExecution()">
-                    <i class="fas fa-play"></i> Запустить автоматику
-                </button>
-                <button class="btn btn-warning" onclick="showQueueManagement()">
-                    <i class="fas fa-list"></i> Управление очередями
-                </button>
-                <span id="automationStatus" class="badge bg-secondary ms-3">Автоматика остановлена</span>
+                <div class="row">
+                    <div class="col-md-6">
+                        <button id="processAutomation" class="btn btn-success me-2" onclick="processAutomaticExecution()">
+                            <i class="fas fa-play"></i> Запустить автоматику
+                        </button>
+                        <button class="btn btn-warning me-2" onclick="showQueueManagement()">
+                            <i class="fas fa-list"></i> Управление очередями
+                        </button>
+                        <span id="automationStatus" class="badge bg-secondary ms-3">Статус автоматики</span>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-secondary" onclick="zoomGantt(-1)">
+                                <i class="fas fa-search-minus"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="zoomGantt(1)">
+                                <i class="fas fa-search-plus"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="scrollToNow()">
+                                <i class="fas fa-clock"></i> Сейчас
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -87,12 +111,12 @@
                 <div class="row">
                     <div class="col-md-12">
                         <strong>Легенда:</strong>
-                        <span class="badge bg-secondary ms-2">Готов к запуску</span>
-                        <span class="badge bg-info ms-2">В очереди</span>
+                        <span class="badge bg-info ms-2">Готов к запуску</span>
+                        <span class="badge bg-warning ms-2">В очереди</span>
                         <span class="badge bg-primary ms-2">В работе</span>
-                        <span class="badge bg-warning ms-2">На паузе</span>
+                        <span class="badge bg-secondary ms-2">На паузе</span>
                         <span class="badge bg-success ms-2">Завершен</span>
-                        <span class="badge bg-dark ms-2">Переналадка</span>
+                        <span class="badge" style="background-color: #FF9800; color: white;" ms-2>Переналадка</span>
                     </div>
                 </div>
             </div>
@@ -152,8 +176,9 @@
     // Глобальные переменные
     let ganttChart = null;
     let ganttDataGlobal = [];
-    let ganttData = null;
     let selectedStageId = null;
+    let chartContainer = null;
+    let zoomLevel = 0;
 
     // Загрузка библиотеки Google Charts
     google.charts.load('current', {
@@ -164,7 +189,8 @@
 
     function drawChart() {
         updateGantt();
-        setInterval(updateGantt, 30000); // Обновляем каждые 30 секунд
+        // Обновляем график каждые 30 секунд
+        setInterval(updateGantt, 30000);
     }
 
     function updateGantt() {
@@ -172,6 +198,7 @@
         const machineId = document.getElementById('machineFilter').value;
         const startDate = document.getElementById('startDate').value;
         const endDate = document.getElementById('endDate').value;
+        const hideCompleted = document.getElementById('hideCompleted').checked;
 
         // Показываем индикатор загрузки
         document.getElementById('gantt_chart').innerHTML =
@@ -182,6 +209,7 @@
         if (machineId) params.append('machineId', machineId);
         if (startDate) params.append('startDate', startDate);
         if (endDate) params.append('endDate', endDate);
+        params.append('hideCompleted', hideCompleted);
 
         fetch(`/Gantt/GetGanttData?${params.toString()}`)
             .then(response => {
@@ -191,7 +219,7 @@
                 return response.json();
             })
             .then(data => {
-                console.log('Полученные данные:', data);
+                console.log('Получено данных: ' + data.length);
                 ganttDataGlobal = data;
                 drawGanttChart(data);
                 loadMachineUtilization();
@@ -203,7 +231,13 @@
             });
     }
 
-        function drawGanttChart(data) {
+    function drawGanttChart(data) {
+        if (!data || data.length === 0) {
+            document.getElementById('gantt_chart').innerHTML =
+                '<div class="alert alert-info">Нет данных для отображения. Попробуйте изменить фильтры.</div>';
+            return;
+        }
+
         const ganttData = new google.visualization.DataTable();
 
         // Структура для диаграммы Ганта
@@ -216,33 +250,69 @@
         ganttData.addColumn('number', 'Percent Complete');
         ganttData.addColumn('string', 'Dependencies');
 
-        // Добавляем строки с корректными статусами
+        // Добавляем строки с корректными датами
         data.forEach(item => {
-            const startDate = parseDate(item.actualStart || item.start);
-            const endDate = parseDate(item.actualEnd || item.end);
+            try {
+                const startDate = parseDate(item.actualStart || item.start);
+                const endDate = parseDate(item.actualEnd || item.end);
 
-            // Duration в миллисекундах для Google Charts
-            const duration = endDate.getTime() - startDate.getTime();
+                // Проверка корректности дат
+                if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+                    console.warn(`Пропущены некорректные даты для задачи ${item.taskId}:`, item);
+                    return;
+                }
 
-            // Всегда устанавливаем percentComplete = 100 для завершенных задач
-            let percentComplete = item.percentComplete || 0;
-            if (item.status === 'Completed') {
-                percentComplete = 100;
+                // Duration в миллисекундах для Google Charts
+                const duration = endDate.getTime() - startDate.getTime();
+                if (duration <= 0) {
+                    console.warn(`Пропущено нулевое или отрицательное duration для задачи ${item.taskId}:`, item);
+                    return;
+                }
+
+                // Всегда устанавливаем percentComplete = 100 для завершенных задач
+                let percentComplete = item.percentComplete || 0;
+                if (item.status === 'Completed') {
+                    percentComplete = 100;
+                }
+
+                ganttData.addRow([
+                    item.taskId,
+                    item.taskName,
+                    item.resource || 'Не назначен',
+                    startDate,
+                    endDate,
+                    duration,
+                    percentComplete,
+                    item.dependencies || null
+                ]);
+            } catch (err) {
+                console.error(`Ошибка при добавлении задачи ${item.taskId}:`, err);
             }
-
-            ganttData.addRow([
-                item.taskId,
-                item.taskName,
-                item.resource || 'Не назначен',
-                startDate,
-                endDate,
-                duration,
-                percentComplete,
-                item.dependencies || null
-            ]);
         });
 
-        // Опции диаграммы с улучшенным отображением статусов
+        if (ganttData.getNumberOfRows() === 0) {
+            document.getElementById('gantt_chart').innerHTML =
+                '<div class="alert alert-warning">Нет корректных данных для отображения после фильтрации.</div>';
+            return;
+        }
+
+        // Вычисляем оптимальные даты для отображения
+        const today = new Date();
+        let minDate = new Date(today);
+        minDate.setDate(today.getDate() - 7);
+        let maxDate = new Date(today);
+        maxDate.setDate(today.getDate() + 14);
+
+        // Корректируем масштаб на основе zoomLevel
+        const zoomFactor = Math.pow(1.5, zoomLevel);
+        const zoomRangeDays = 21 / zoomFactor; // 21 день / фактор масштабирования
+
+        minDate = new Date(today);
+        minDate.setDate(today.getDate() - Math.floor(zoomRangeDays/2));
+        maxDate = new Date(today);
+        maxDate.setDate(today.getDate() + Math.ceil(zoomRangeDays/2));
+
+        // Опции диаграммы с улучшенным отображением
         const options = {
             height: 700,
             width: '100%',
@@ -250,45 +320,24 @@
                 trackHeight: 35,
                 barHeight: 25,
                 criticalPathEnabled: false,
+                defaultStartDate: minDate,
                 innerGridHorizontalStroke: '#eeeeee',
                 innerGridVerticalStroke: '#eeeeee',
                 labelStyle: {
                     fontName: 'Arial',
                     fontSize: 12,
                     color: '#333'
-                },
-                // Цветовая палитра по статусам
-                palette: [
-                    {
-                        "color": "#17a2b8", // Ready - голубой
-                        "dark": "#138496",
-                        "light": "#5bc0de"
-                    },
-                    {
-                        "color": "#0d6efd", // InProgress - синий
-                        "dark": "#0a58ca",
-                        "light": "#6ea8fe"
-                    },
-                    {
-                        "color": "#ffc107", // Paused/Waiting - желтый
-                        "dark": "#ffb000",
-                        "light": "#ffda6a"
-                    },
-                    {
-                        "color": "#198754", // Completed - зеленый
-                        "dark": "#146c43",
-                        "light": "#75b798"
-                    },
-                    {
-                        "color": "#6c757d", // Changeover - серый
-                        "dark": "#5a5a5a",
-                        "light": "#8e8e8e"
-                    }
-                ]
+                }
+            },
+            hAxis: {
+                format: 'dd.MM HH:mm',
+                minValue: minDate,
+                maxValue: maxDate
             }
         };
 
-        ganttChart = new google.visualization.Gantt(document.getElementById('gantt_chart'));
+        chartContainer = document.getElementById('gantt_chart');
+        ganttChart = new google.visualization.Gantt(chartContainer);
 
         // Обработчик кликов
         google.visualization.events.addListener(ganttChart, 'select', function () {
@@ -302,14 +351,58 @@
         });
 
         ganttChart.draw(ganttData, options);
+
+        // Скролл к текущей дате
+        scrollToNow();
+    }
+
+    // Функция для масштабирования
+    function zoomGantt(direction) {
+        zoomLevel += direction;
+        if (zoomLevel < -2) zoomLevel = -2;
+        if (zoomLevel > 3) zoomLevel = 3;
+
+        // Перерисовываем с новым масштабом
+        if (ganttDataGlobal.length > 0) {
+            drawGanttChart(ganttDataGlobal);
+        }
+    }
+
+    // Функция для скролла к текущей дате
+    function scrollToNow() {
+        if (chartContainer && ganttChart) {
+            // Скроллим к текущей дате через небольшую задержку
+            setTimeout(() => {
+                // Находим элемент с текущей датой и скроллим к нему
+                const today = new Date();
+                const todayStr = today.toISOString().split('T')[0];
+                const dateElements = chartContainer.querySelectorAll('text');
+
+                // Ищем ближайший элемент с текущей датой
+                for (let el of dateElements) {
+                    if (el.textContent.includes(todayStr.substring(5))) { // MM-DD формат
+                        // Скроллим так, чтобы текущая дата была посередине
+                        const rect = el.getBoundingClientRect();
+                        const containerRect = chartContainer.getBoundingClientRect();
+                        chartContainer.scrollLeft = rect.left - containerRect.left - containerRect.width/2;
+                        break;
+                    }
+                }
+            }, 500);
+        }
     }
 
     function parseDate(dateString) {
         if (!dateString) return new Date();
 
-        // Парсим дату в правильном формате
-        const date = new Date(dateString);
-        return isNaN(date.getTime()) ? new Date() : date;
+        try {
+            // Парсим дату в правильном формате
+            const date = new Date(dateString);
+            return isNaN(date.getTime()) ? new Date() : date;
+        } catch (e) {
+            console.error('Ошибка парсинга даты:', dateString, e);
+            return new Date();
+        }
     }
 
     function loadMachineUtilization() {
@@ -325,6 +418,12 @@
         fetch(`/Gantt/GetMachineUtilization?${params.toString()}`)
             .then(response => response.json())
             .then(data => {
+                if (data.length === 0) {
+                    document.getElementById('utilization_chart').innerHTML =
+                        '<div class="alert alert-info">Нет данных о загрузке станков за выбранный период.</div>';
+                    return;
+                }
+
                 const dataTable = new google.visualization.DataTable();
                 dataTable.addColumn('string', 'Станок');
                 dataTable.addColumn('number', 'Производство (ч)');
@@ -349,7 +448,8 @@
                         0: { color: '#28a745' },
                         1: { color: '#ffc107' }
                     },
-                    backgroundColor: 'white'
+                    backgroundColor: 'white',
+                    legend: { position: 'top' }
                 };
 
                 const chart = new google.visualization.BarChart(document.getElementById('utilization_chart'));
@@ -369,6 +469,8 @@
 
         button.disabled = true;
         button.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Обработка...';
+        status.textContent = 'Выполняется...';
+        status.className = 'badge bg-primary ms-3';
 
         fetch('/api/Automation/process', {
             method: 'POST',
@@ -379,12 +481,12 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                status.textContent = 'Автоматика выполнена';
+                status.textContent = 'Успешно выполнено';
                 status.className = 'badge bg-success ms-3';
                 updateGantt(); // Обновляем диаграмму
                 showToast('Автоматическая обработка выполнена успешно', 'success');
             } else {
-                status.textContent = 'Ошибка автоматики';
+                status.textContent = 'Ошибка выполнения';
                 status.className = 'badge bg-danger ms-3';
                 showToast('Ошибка: ' + data.message, 'error');
             }
@@ -398,6 +500,12 @@
         .finally(() => {
             button.disabled = false;
             button.innerHTML = '<i class="fas fa-play"></i> Запустить автоматику';
+
+            // Через 5 секунд сбрасываем статус
+            setTimeout(() => {
+                status.textContent = 'Готово к запуску';
+                status.className = 'badge bg-secondary ms-3';
+            }, 5000);
         });
     }
 
@@ -410,9 +518,11 @@
             return;
         }
 
-        console.log('Запрос очереди для станка:', machineId);
+        document.getElementById('queueContent').innerHTML =
+            '<div class="text-center"><i class="fa fa-spinner fa-spin"></i> Загрузка данных очереди...</div>';
 
-        // Используем правильный URL для MVC
+        $('#queueModal').modal('show');
+
         fetch(`/Gantt/GetMachineQueue?id=${machineId}`)
             .then(response => {
                 if (!response.ok) {
@@ -421,22 +531,24 @@
                 return response.json();
             })
             .then(data => {
-                console.log('Получены данные очереди:', data);
-
                 if (!data.success) {
                     showToast('Ошибка: ' + data.message, 'error');
+                    $('#queueModal').modal('hide');
                     return;
                 }
 
                 let html = `<h6>Очередь для станка: ${data.machine}</h6>`;
                 if (data.queue && data.queue.length > 0) {
                     html += '<table class="table table-sm">';
-                    html += '<thead><tr><th>Операция</th><th>Деталь</th><th>Прогноз</th><th>Действия</th></tr></thead>';
+                    html += '<thead><tr><th>Операция</th><th>Деталь</th><th>Заказ</th><th>Тип</th><th>Прогноз</th><th>Действия</th></tr></thead>';
                     html += '<tbody>';
                     data.queue.forEach(item => {
+                        const isChangeover = item.stageType === 'Changeover';
                         html += `<tr>
                             <td>${item.name}</td>
                             <td>${item.detailName}</td>
+                            <td>${item.orderNumber}</td>
+                            <td>${isChangeover ? '<span class="badge" style="background-color: #FF9800; color: white;">Переналадка</span>' : 'Операция'}</td>
                             <td>${item.estimatedStart ? new Date(item.estimatedStart).toLocaleString() : '-'}</td>
                             <td>
                                 <button class="btn btn-sm btn-danger" onclick="removeFromQueue(${item.id})">
@@ -447,15 +559,15 @@
                     });
                     html += '</tbody></table>';
                 } else {
-                    html += '<p class="text-muted">Очередь пуста</p>';
+                    html += '<div class="alert alert-info">Очередь пуста</div>';
                 }
 
                 document.getElementById('queueContent').innerHTML = html;
-                $('#queueModal').modal('show');
             })
             .catch(error => {
                 console.error('Error loading queue:', error);
-                showToast('Ошибка загрузки очереди: ' + error.message, 'error');
+                document.getElementById('queueContent').innerHTML =
+                    `<div class="alert alert-danger">Ошибка загрузки очереди: ${error.message}</div>`;
             });
     }
 
@@ -463,9 +575,11 @@
     function showStageActions(stageData) {
         selectedStageId = stageData.stageId;
 
-        console.log('Запрос информации об этапе:', stageData.stageId);
+        document.getElementById('stageInfo').innerHTML =
+            '<div class="text-center"><i class="fa fa-spinner fa-spin"></i> Загрузка информации...</div>';
 
-        // Используем правильный URL для MVC
+        $('#stageActionModal').modal('show');
+
         fetch(`/Gantt/GetStageInfo?id=${stageData.stageId}`)
             .then(response => {
                 if (!response.ok) {
@@ -474,14 +588,19 @@
                 return response.json();
             })
             .then(data => {
-                console.log('Получены данные этапа:', data);
                 // Остальной код без изменений
                 let infoHtml = `
                     <div class="row">
                         <div class="col-12">
                             <h6>${data.name}</h6>
                             <p class="mb-1"><strong>Деталь:</strong> ${data.detailName}</p>
+                            <p class="mb-1"><strong>Заказ:</strong> ${data.orderNumber}</p>
                             <p class="mb-1"><strong>Станок:</strong> ${data.machineName || 'Не назначен'}</p>
+                            <p class="mb-1"><strong>Тип:</strong>
+                                ${data.stageType === 'Changeover' ?
+                                    '<span class="badge" style="background-color: #FF9800; color: white;">Переналадка</span>' :
+                                    'Операция'}
+                            </p>
                             <p class="mb-1"><strong>Статус:</strong>
                                 <span class="badge ${getStatusBadgeClass(data.status)}">${data.status}</span>
                             </p>
@@ -525,17 +644,20 @@
 
                 document.getElementById('stageInfo').innerHTML = infoHtml;
                 document.getElementById('stageActions').innerHTML = actionsHtml;
-                $('#stageActionModal').modal('show');
             })
             .catch(error => {
                 console.error('Error loading stage info:', error);
-                showToast('Ошибка загрузки информации об этапе: ' + error.message, 'error');
+                document.getElementById('stageInfo').innerHTML =
+                    `<div class="alert alert-danger">Ошибка загрузки информации об этапе: ${error.message}</div>`;
             });
     }
 
     // Функции управления этапами
     function addToQueue(stageId) {
         console.log('Добавление в очередь этапа:', stageId);
+
+        document.getElementById('stageActions').innerHTML =
+            '<div class="text-center"><i class="fa fa-spinner fa-spin"></i> Добавление в очередь...</div>';
 
         fetch(`/Gantt/AddStageToQueue?id=${stageId}`, { method: 'POST' })
             .then(response => response.json())
@@ -546,16 +668,33 @@
                     $('#stageActionModal').modal('hide');
                 } else {
                     showToast('Ошибка: ' + data.message, 'error');
+                    // Восстанавливаем кнопки действий
+                    showStageActions({stageId: stageId});
                 }
             })
             .catch(error => {
                 console.error('Error adding to queue:', error);
                 showToast('Ошибка добавления в очередь', 'error');
+                // Восстанавливаем кнопки действий
+                showStageActions({stageId: stageId});
             });
     }
 
     function removeFromQueue(stageId) {
         console.log('Удаление из очереди этапа:', stageId);
+
+        // Находим и блокируем кнопку удаления из очереди
+        const modalElement = document.getElementById('stageActionModal').classList.contains('show') ?
+            'stageActions' : 'queueContent';
+
+        const element = document.getElementById(modalElement);
+        if (element) {
+            const button = element.querySelector(`button[onclick*="${stageId}"]`);
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Удаление...';
+            }
+        }
 
         fetch(`/Gantt/RemoveStageFromQueue?id=${stageId}`, { method: 'POST' })
             .then(response => response.json())
@@ -563,15 +702,35 @@
                 if (data.success) {
                     showToast('Этап убран из очереди', 'success');
                     updateGantt();
-                    $('#stageActionModal').modal('hide');
-                    $('#queueModal').modal('hide');
+
+                    // Обновляем модальные окна
+                    if (document.getElementById('queueModal').classList.contains('show')) {
+                        showQueueManagement(); // Обновляем модальное окно очереди
+                    }
+
+                    if (document.getElementById('stageActionModal').classList.contains('show')) {
+                        $('#stageActionModal').modal('hide');
+                    }
                 } else {
                     showToast('Ошибка: ' + data.message, 'error');
+                    // Восстанавливаем кнопки
+                    if (document.getElementById('queueModal').classList.contains('show')) {
+                        showQueueManagement();
+                    } else if (document.getElementById('stageActionModal').classList.contains('show')) {
+                        showStageActions({stageId: stageId});
+                    }
                 }
             })
             .catch(error => {
                 console.error('Error removing from queue:', error);
                 showToast('Ошибка удаления из очереди', 'error');
+
+                // Восстанавливаем кнопки
+                if (document.getElementById('queueModal').classList.contains('show')) {
+                    showQueueManagement();
+                } else if (document.getElementById('stageActionModal').classList.contains('show')) {
+                    showStageActions({stageId: stageId});
+                }
             });
     }
 
@@ -580,6 +739,9 @@
         if (!reason) return;
 
         console.log('Освобождение станка:', machineId, 'для этапа:', urgentStageId);
+
+        document.getElementById('stageActions').innerHTML =
+            '<div class="text-center"><i class="fa fa-spinner fa-spin"></i> Освобождение станка...</div>';
 
         fetch(`/Gantt/ReleaseMachine`, {
             method: 'POST',
@@ -600,11 +762,15 @@
                 $('#stageActionModal').modal('hide');
             } else {
                 showToast('Ошибка: ' + data.message, 'error');
+                // Восстанавливаем кнопки действий
+                showStageActions({stageId: urgentStageId});
             }
         })
         .catch(error => {
             console.error('Error releasing machine:', error);
             showToast('Ошибка освобождения станка', 'error');
+            // Восстанавливаем кнопки действий
+            showStageActions({stageId: urgentStageId});
         });
     }
 
@@ -615,7 +781,7 @@
             'Ready': 'bg-info',
             'Waiting': 'bg-warning',
             'InProgress': 'bg-primary',
-            'Paused': 'bg-warning',
+            'Paused': 'bg-secondary',
             'Completed': 'bg-success',
             'Cancelled': 'bg-danger'
         };
@@ -623,29 +789,55 @@
     }
 
     function showToast(message, type = 'info') {
-        // Простая реализация уведомлений
+        // Удаляем существующие уведомления
+        const existingToasts = document.querySelectorAll('.toast-notification');
+        existingToasts.forEach(toast => toast.remove());
+
+        // Определяем стиль уведомления
         const alertClass = type === 'success' ? 'alert-success' :
-                          type === 'error' ? 'alert-danger' : 'alert-info';
+                          type === 'error' ? 'alert-danger' :
+                          type === 'warning' ? 'alert-warning' : 'alert-info';
 
         const toast = $(`
-            <div class="alert ${alertClass} alert-dismissible fade show position-fixed"
-                 style="top: 20px; right: 20px; z-index: 9999;">
+            <div class="alert ${alertClass} alert-dismissible fade show position-fixed toast-notification"
+                 style="top: 20px; right: 20px; z-index: 9999; min-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
                 ${message}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         `);
 
         $('body').append(toast);
-        setTimeout(() => toast.remove(), 5000);
+        setTimeout(() => toast.alert('close'), 5000);
     }
 
     // Инициализация при загрузке страницы
     document.addEventListener('DOMContentLoaded', function() {
         const today = new Date();
         const oneWeekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const oneWeekLater = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const twoWeeksLater = new Date(today.getTime() + 14 * 24 * 60 * 60 * 1000);
 
         document.getElementById('startDate').value = oneWeekAgo.toISOString().split('T')[0];
-        document.getElementById('endDate').value = oneWeekLater.toISOString().split('T')[0];
+        document.getElementById('endDate').value = twoWeeksLater.toISOString().split('T')[0];
+
+        // Устанавливаем начальный статус
+        document.getElementById('automationStatus').textContent = 'Готово к запуску';
+
+        // Подготавливаем CSS для скролла диаграммы
+        const styleEl = document.createElement('style');
+        styleEl.textContent = `
+            #gantt_chart {
+                overflow-x: auto;
+                overflow-y: auto;
+                position: relative;
+            }
+            .toast-notification {
+                animation: fadeInOut 0.3s ease-in-out;
+            }
+    @@keyframes fadeInOut {
+                0% { opacity: 0; transform: translateY(-20px); }
+                100% { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(styleEl);
     });
 </script>

@@ -17,7 +17,7 @@ namespace ProductionSystem.Controllers
             _stageAutomationService = stageAutomationService;
         }
 
-        public async Task<IActionResult> Index(int? orderId, int? machineId)
+        public async Task<IActionResult> Index(int? orderId, int? machineId, bool hideCompleted = false)
         {
             ViewBag.Orders = await _context.ProductionOrders
                 .Select(po => new { po.Id, po.Number, po.Detail.Name })
@@ -29,12 +29,13 @@ namespace ProductionSystem.Controllers
 
             ViewBag.SelectedOrderId = orderId;
             ViewBag.SelectedMachineId = machineId;
+            ViewBag.HideCompleted = hideCompleted;
 
             return View();
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetGanttData(int? orderId, int? machineId, DateTime? startDate, DateTime? endDate)
+        public async Task<IActionResult> GetGanttData(int? orderId, int? machineId, DateTime? startDate, DateTime? endDate, bool hideCompleted = false)
         {
             try
             {
@@ -45,7 +46,19 @@ namespace ProductionSystem.Controllers
                     .Include(rs => rs.Machine)
                     .Include(rs => rs.Operation)
                     .Include(rs => rs.StageExecutions)
-                    .Where(rs => rs.Status != "Pending");
+                    .AsQueryable();
+
+                // Фильтруем по статусу (исключая ожидающие задачи - Pending)
+                if (hideCompleted)
+                {
+                    // Если скрываем завершенные - не показываем этапы со статусом Completed
+                    query = query.Where(rs => rs.Status != "Pending" && rs.Status != "Completed");
+                }
+                else
+                {
+                    // Показываем все кроме ожидающих
+                    query = query.Where(rs => rs.Status != "Pending");
+                }
 
                 if (orderId.HasValue)
                 {
@@ -57,37 +70,62 @@ namespace ProductionSystem.Controllers
                     query = query.Where(rs => rs.MachineId == machineId.Value);
                 }
 
-                var stages = await query.OrderBy(rs => rs.SubBatch.ProductionOrder.CreatedAt)
+                // Добавляем фильтры по дате
+                // ИСПРАВЛЕНИЕ: Не преобразуем даты в UTC, используем их как есть (Kind=Unspecified)
+                if (startDate.HasValue)
+                {
+                    // Преобразуем дату, обеспечивая Kind = Unspecified
+                    var startDateUnspecified = DateTime.SpecifyKind(startDate.Value, DateTimeKind.Unspecified);
+                    query = query.Where(rs =>
+                        rs.PlannedEndDate == null ||
+                        rs.PlannedEndDate >= startDateUnspecified);
+                }
+
+                if (endDate.HasValue)
+                {
+                    // Преобразуем дату, обеспечивая Kind = Unspecified
+                    var endDateUnspecified = DateTime.SpecifyKind(endDate.Value, DateTimeKind.Unspecified);
+                    query = query.Where(rs =>
+                        rs.PlannedStartDate == null ||
+                        rs.PlannedStartDate <= endDateUnspecified);
+                }
+
+                var stages = await query
+                    .OrderBy(rs => rs.SubBatch.ProductionOrder.CreatedAt)
                     .ThenBy(rs => rs.SubBatchId)
                     .ThenBy(rs => rs.Order)
                     .ToListAsync();
 
                 var ganttData = new List<object>();
+                var currentDateTime = ProductionContext.GetLocalNow();
 
                 foreach (var stage in stages)
                 {
                     // Определяем даты начала и окончания
-                    var startDate_calc = GetStageStartDate(stage);
-                    var endDate_calc = GetStageEndDate(stage, startDate_calc);
+                    var startDate_calc = GetStageStartDate(stage, currentDateTime);
+                    var endDate_calc = GetStageEndDate(stage, startDate_calc, currentDateTime);
 
                     // Определяем зависимости
                     var dependencies = GetStageDependencies(stage);
 
                     // Вычисляем процент выполнения
-                    var percentComplete = GetStageProgress(stage);
+                    var percentComplete = GetStageProgress(stage, currentDateTime);
 
                     // Формируем название задачи
                     var taskName = $"{stage.SubBatch.ProductionOrder.Detail.Name} - П{stage.SubBatch.BatchNumber} - {stage.Name}";
+
+                    // Формируем цвет для типа этапа
+                    string stageColor = GetStageColor(stage);
 
                     ganttData.Add(new
                     {
                         taskId = $"task_{stage.Id}",
                         taskName = taskName,
                         resource = stage.Machine?.Name ?? "Не назначен",
-                        start = startDate_calc.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
-                        end = endDate_calc.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
-                        actualStart = GetActualStartDate(stage)?.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
-                        actualEnd = GetActualEndDate(stage)?.ToString("yyyy-MM-ddTHH:mm:ss.fffZ"),
+                        start = startDate_calc.ToString("yyyy-MM-ddTHH:mm:ss"),
+                        end = endDate_calc.ToString("yyyy-MM-ddTHH:mm:ss"),
+                        actualStart = GetActualStartDate(stage)?.ToString("yyyy-MM-ddTHH:mm:ss"),
+                        actualEnd = GetActualEndDate(stage)?.ToString("yyyy-MM-ddTHH:mm:ss"),
                         duration = (int)(stage.PlannedTime * 24 * 60 * 60 * 1000), // В миллисекундах
                         percentComplete = percentComplete,
                         dependencies = dependencies,
@@ -101,7 +139,8 @@ namespace ProductionSystem.Controllers
                         machine = stage.Machine != null ? new { stage.Machine.Id, stage.Machine.Name } : null,
                         canReleaseMachine = CanReleaseMachine(stage),
                         canAddToQueue = stage.Status == "Ready",
-                        canRemoveFromQueue = stage.Status == "Waiting"
+                        canRemoveFromQueue = stage.Status == "Waiting",
+                        color = stageColor
                     });
                 }
 
@@ -109,9 +148,27 @@ namespace ProductionSystem.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Ошибка в GetGanttData");
+                Console.WriteLine($"Ошибка в GetGanttData: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 return StatusCode(500, new { error = "Ошибка загрузки данных диаграммы Ганта", details = ex.Message });
             }
+        }
+
+        private string GetStageColor(RouteStage stage)
+        {
+            // Разные цвета для разных статусов и типов
+            if (stage.StageType == "Changeover")
+                return "#FF9800"; // Оранжевый для переналадок
+
+            return stage.Status switch
+            {
+                "Ready" => "#17a2b8", // Голубой
+                "Waiting" => "#ffc107", // Желтый 
+                "InProgress" => "#0d6efd", // Синий
+                "Paused" => "#6c757d", // Серый
+                "Completed" => "#198754", // Зеленый
+                _ => "#343a40" // Темно-серый
+            };
         }
 
         [HttpPost]
@@ -226,7 +283,7 @@ namespace ProductionSystem.Controllers
                     plannedTime = stage.PlannedTime,
                     estimatedStart = estimatedStart,
                     canReleaseMachine = stage.MachineId.HasValue &&
-                                      stage.StageExecutions.Any(se => se.Status == "Started" || se.Status == "Paused"),
+                                      stage.StageExecutions.Any(se => se.Status == "Started"),
                     canAddToQueue = stage.Status == "Ready",
                     canRemoveFromQueue = stage.Status == "Waiting"
                 };
@@ -261,8 +318,7 @@ namespace ProductionSystem.Controllers
                     .Where(rs => rs.Status == "Waiting" &&
                                rs.Operation != null &&
                                rs.Operation.MachineTypeId == machine.MachineTypeId)
-                    .OrderBy(rs => rs.SubBatch.ProductionOrder.CreatedAt)
-                    .ThenBy(rs => rs.Order)
+                    .OrderBy(rs => rs.PlannedStartDate) // Сортируем по времени добавления в очередь
                     .ToListAsync();
 
                 var queueInfo = new List<object>();
@@ -285,7 +341,8 @@ namespace ProductionSystem.Controllers
                         name = stage.Name,
                         detailName = stage.SubBatch.ProductionOrder.Detail.Name,
                         orderNumber = stage.SubBatch.ProductionOrder.Number,
-                        estimatedStart = estimatedStart
+                        estimatedStart = estimatedStart,
+                        stageType = stage.StageType
                     });
                 }
 
@@ -298,9 +355,8 @@ namespace ProductionSystem.Controllers
             }
         }
 
-
-        // Вспомогательные методы
-        private DateTime GetStageStartDate(RouteStage stage)
+        // Вспомогательные методы - начало
+        private DateTime GetStageStartDate(RouteStage stage, DateTime currentTime)
         {
             // Проверяем, есть ли фактическое время начала
             var execution = stage.StageExecutions.FirstOrDefault();
@@ -319,15 +375,15 @@ namespace ProductionSystem.Controllers
 
             if (previousStage != null)
             {
-                var previousEndDate = GetStageEndDate(previousStage, GetStageStartDate(previousStage));
+                var previousEndDate = GetStageEndDate(previousStage, GetStageStartDate(previousStage, currentTime), currentTime);
                 return previousEndDate;
             }
 
-            // Если это первый этап, берем время создания подпартии
-            return stage.SubBatch.CreatedAt;
+            // Если это первый этап, берем текущее время
+            return currentTime;
         }
 
-        private DateTime GetStageEndDate(RouteStage stage, DateTime startDate)
+        private DateTime GetStageEndDate(RouteStage stage, DateTime startDate, DateTime currentTime)
         {
             // Проверяем, есть ли фактическое время окончания
             var execution = stage.StageExecutions.FirstOrDefault();
@@ -338,51 +394,32 @@ namespace ProductionSystem.Controllers
             if (stage.PlannedEndDate != null)
                 return stage.PlannedEndDate.Value;
 
-            // Рассчитываем на основе планового времени с учетом смен
-            return CalculateEndDateWithShifts(startDate, stage.PlannedTime, stage.MachineId);
-        }
-
-        private DateTime CalculateEndDateWithShifts(DateTime startDate, decimal plannedHours, int? machineId)
-        {
-            if (!machineId.HasValue)
-                return startDate.AddHours((double)plannedHours);
-
-            // Получаем сервис смен
-            var shiftService = HttpContext.RequestServices.GetService<IShiftService>();
-
-            if (shiftService == null)
-                return startDate.AddHours((double)plannedHours); // Если сервис недоступен
-
-            // Проверяем, является ли время начала рабочим
-            if (!shiftService.IsWorkingTime(startDate, machineId))
+            // Для запущенных этапов оцениваем прогрессивно
+            if (stage.Status == "InProgress" && execution?.StartedAt != null)
             {
-                // Ищем ближайшее рабочее время
-                startDate = shiftService.GetNextWorkingDateTime(startDate, machineId);
-            }
+                var elapsedTime = currentTime - execution.StartedAt.Value;
+                var elapsedHours = (decimal)elapsedTime.TotalHours;
 
-            // Расчет фактической даты окончания с учетом только рабочего времени
-            var currentDate = startDate;
-            var remainingHours = plannedHours;
-
-            while (remainingHours > 0)
-            {
-                if (shiftService.IsWorkingTime(currentDate, machineId))
+                // Учитываем паузы
+                if (execution.PauseTime.HasValue)
                 {
-                    // Вычитаем 5 минут из оставшегося времени (более точный расчет сделает систему более медленной)
-                    remainingHours -= 5.0m / 60.0m; // 5 минут в часах
+                    elapsedHours -= execution.PauseTime.Value;
                 }
 
-                // Если еще осталось время, добавляем 5 минут к текущей дате
-                if (remainingHours > 0)
+                // Если уже превысили, считаем завершение через 10% оставшегося времени
+                if (elapsedHours >= stage.PlannedTime)
                 {
-                    currentDate = currentDate.AddMinutes(5);
+                    return currentTime.AddHours((double)(stage.PlannedTime * 0.1m));
                 }
+
+                // Иначе расчет от прогресса
+                var remainingTime = stage.PlannedTime - elapsedHours;
+                return currentTime.AddHours((double)remainingTime);
             }
 
-            return currentDate;
+            // Рассчитываем на основе планового времени
+            return startDate.AddHours((double)stage.PlannedTime);
         }
-
-
 
         private DateTime? GetActualStartDate(RouteStage stage)
         {
@@ -399,20 +436,20 @@ namespace ProductionSystem.Controllers
             return stage.StageExecutions.FirstOrDefault()?.ActualTime;
         }
 
-        private int GetStageProgress(RouteStage stage)
+        private int GetStageProgress(RouteStage stage, DateTime currentTime)
         {
             return stage.Status switch
             {
                 "Completed" => 100,
-                "InProgress" => CalculateProgress(stage),
-                "Paused" => CalculateProgress(stage),
+                "InProgress" => CalculateProgress(stage, currentTime),
+                "Paused" => CalculateProgress(stage, currentTime),
                 "Ready" => 0,
                 "Waiting" => 0,
                 _ => 0
             };
         }
 
-        private int CalculateProgress(RouteStage stage)
+        private int CalculateProgress(RouteStage stage, DateTime currentTime)
         {
             var execution = stage.StageExecutions.FirstOrDefault();
             if (execution?.StartedAt == null) return 0;
@@ -420,7 +457,7 @@ namespace ProductionSystem.Controllers
             // Определяем конечное время для расчета
             var endTime = execution.Status == "Paused" && execution.PausedAt.HasValue
                         ? execution.PausedAt.Value
-                        : ProductionContext.GetLocalNow();
+                        : currentTime;
 
             var elapsedTime = endTime - execution.StartedAt.Value;
             var elapsedMinutes = elapsedTime.TotalMinutes;
@@ -441,11 +478,10 @@ namespace ProductionSystem.Controllers
             return 25;
         }
 
-
         private bool CanReleaseMachine(RouteStage stage)
         {
             return stage.MachineId.HasValue &&
-                   stage.StageExecutions.Any(se => se.Status == "Started" || se.Status == "Paused");
+                   stage.StageExecutions.Any(se => se.Status == "Started");
         }
 
         private string GetStageDependencies(RouteStage stage)
@@ -457,16 +493,15 @@ namespace ProductionSystem.Controllers
 
             return previousStage != null ? $"task_{previousStage.Id}" : "";
         }
+        // Вспомогательные методы - конец
 
-        private bool CanStageBeMoved(RouteStage stage)
-        {
-            return stage.Status == "Ready" || stage.Status == "Waiting";
-        }
-
-        // Методы из оригинального контроллера
         [HttpPost]
         public async Task<IActionResult> UpdateStageDates(int stageId, DateTime startDate, DateTime endDate)
         {
+            // ИСПРАВЛЕНИЕ: Преобразуем даты к Kind=Unspecified
+            startDate = DateTime.SpecifyKind(startDate, DateTimeKind.Unspecified);
+            endDate = DateTime.SpecifyKind(endDate, DateTimeKind.Unspecified);
+
             var stage = await _context.RouteStages.FindAsync(stageId);
             if (stage != null)
             {
@@ -503,15 +538,16 @@ namespace ProductionSystem.Controllers
 
                 if (startDate.HasValue)
                 {
+                    // ИСПРАВЛЕНИЕ: Преобразуем дату к Kind=Unspecified
                     var start = DateTime.SpecifyKind(startDate.Value, DateTimeKind.Unspecified);
                     query = query.Where(se => se.StartedAt >= start);
                 }
 
                 if (endDate.HasValue)
                 {
+                    // ИСПРАВЛЕНИЕ: Преобразуем дату к Kind=Unspecified
                     var end = DateTime.SpecifyKind(endDate.Value, DateTimeKind.Unspecified);
                     query = query.Where(se => se.CompletedAt <= end);
-
                 }
 
                 var executions = await query.ToListAsync();

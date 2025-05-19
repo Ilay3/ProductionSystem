@@ -10,6 +10,11 @@ namespace ProductionSystem.Controllers
         private readonly IStageAutomationService _automationService;
         private readonly ILogger<AutomationController> _logger;
 
+        // Добавляем блокировку для предотвращения одновременных вызовов
+        private static readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
+        private static DateTime _lastProcessingTime = DateTime.MinValue;
+        private const int MIN_INTERVAL_SECONDS = 5;
+
         public AutomationController(IStageAutomationService automationService, ILogger<AutomationController> logger)
         {
             _automationService = automationService;
@@ -22,15 +27,49 @@ namespace ProductionSystem.Controllers
         [HttpPost("process")]
         public async Task<IActionResult> ProcessAutomaticStageExecution()
         {
+            // Проверяем, не слишком ли часто вызывается метод
+            var now = DateTime.UtcNow;
+            var elapsed = (now - _lastProcessingTime).TotalSeconds;
+
+            if (elapsed < MIN_INTERVAL_SECONDS)
+            {
+                _logger.LogWarning($"Слишком частый вызов автоматики: {elapsed:F1} сек. с предыдущего запуска");
+                return Ok(new
+                {
+                    success = true,
+                    message = $"Автоматическая обработка уже выполнялась недавно. Пожалуйста, подождите {MIN_INTERVAL_SECONDS - (int)elapsed} сек."
+                });
+            }
+
+            // Пытаемся получить блокировку
+            if (!await _semaphore.WaitAsync(TimeSpan.FromSeconds(1)))
+            {
+                _logger.LogWarning("Ручная автоматическая обработка уже выполняется");
+                return Ok(new
+                {
+                    success = true,
+                    message = "Автоматическая обработка уже выполняется. Пожалуйста, подождите."
+                });
+            }
+
             try
             {
+                _lastProcessingTime = now;
+                _logger.LogInformation("Запуск ручной автоматической обработки этапов");
+
                 await _automationService.ProcessAutomaticStageExecution();
+
                 return Ok(new { success = true, message = "Автоматическая обработка этапов выполнена успешно" });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during manual automation processing");
-                return BadRequest(new { success = false, message = ex.Message });
+                _logger.LogError(ex, "Ошибка во время ручной автоматической обработки");
+                return BadRequest(new { success = false, message = $"Ошибка: {ex.Message}" });
+            }
+            finally
+            {
+                // Освобождаем блокировку
+                _semaphore.Release();
             }
         }
 
@@ -47,7 +86,7 @@ namespace ProductionSystem.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error getting estimated start time for stage {stageId}");
+                _logger.LogError(ex, $"Ошибка получения прогнозируемого времени для этапа {stageId}");
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
@@ -65,7 +104,7 @@ namespace ProductionSystem.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error adding stage {stageId} to queue");
+                _logger.LogError(ex, $"Ошибка добавления этапа {stageId} в очередь");
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
@@ -83,7 +122,7 @@ namespace ProductionSystem.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error removing stage {stageId} from queue");
+                _logger.LogError(ex, $"Ошибка удаления этапа {stageId} из очереди");
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
@@ -96,6 +135,11 @@ namespace ProductionSystem.Controllers
         {
             try
             {
+                if (string.IsNullOrEmpty(request.Reason))
+                {
+                    request.Reason = "Срочная задача";
+                }
+
                 var success = await _automationService.ReleaseMachine(request.MachineId, request.UrgentStageId, request.Reason);
                 return Ok(new
                 {
@@ -105,7 +149,7 @@ namespace ProductionSystem.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error releasing machine {request.MachineId}");
+                _logger.LogError(ex, $"Ошибка освобождения станка {request.MachineId}");
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
