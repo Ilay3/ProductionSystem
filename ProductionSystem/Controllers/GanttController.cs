@@ -126,7 +126,7 @@ namespace ProductionSystem.Controllers
                         end = endDate_calc.ToString("yyyy-MM-ddTHH:mm:ss"),
                         actualStart = GetActualStartDate(stage)?.ToString("yyyy-MM-ddTHH:mm:ss"),
                         actualEnd = GetActualEndDate(stage)?.ToString("yyyy-MM-ddTHH:mm:ss"),
-                        duration = (int)(stage.PlannedTime * 24 * 60 * 60 * 1000), // В миллисекундах
+                        duration = (long)(stage.PlannedTime * 24 * 60 * 60 * 1000), // В миллисекундах
                         percentComplete = percentComplete,
                         dependencies = dependencies,
                         status = stage.Status,
