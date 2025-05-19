@@ -133,7 +133,7 @@ namespace ProductionSystem.Controllers
                         stageType = stage.StageType,
                         subBatchId = stage.SubBatchId,
                         orderId = stage.SubBatch.ProductionOrderId,
-                        stageId = stage.Id,
+                        stageId = stage.Id, 
                         plannedTime = stage.PlannedTime,
                         actualTime = GetActualTime(stage),
                         machine = stage.Machine != null ? new { stage.Machine.Id, stage.Machine.Name } : null,
