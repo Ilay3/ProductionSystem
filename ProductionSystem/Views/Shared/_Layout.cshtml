@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/gantt.css" asp-append-version="true" />
     <script src="https://www.gstatic.com/charts/loader.js"></script>
-
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gantt-chart@0.2.2/dist/gantt-chart.min.css">
     <style>
         /* Дополнительные стили для улучшения UX */
         .btn-group-action {
@@ -133,6 +133,11 @@
                                 <li>
                                     <a class="dropdown-item" asp-controller="Changeovers" asp-action="Index">
                                         <i class="fas fa-exchange-alt me-2"></i>Переналадки
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" asp-controller="Shifts" asp-action="Index">
+                                        <i class="fas fa-exchange-alt me-2"></i>Смены
                                     </a>
                                 </li>
                             </ul>

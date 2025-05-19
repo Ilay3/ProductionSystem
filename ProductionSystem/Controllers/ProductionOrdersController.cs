@@ -142,6 +142,13 @@ namespace ProductionSystem.Controllers
 
             foreach (var operation in operations)
             {
+                // ИСПРАВЛЕНИЕ: Проверка, что TimePerPiece корректно рассчитано
+                var timePerPiece = Math.Max(0.001m, operation.TimePerPiece);
+                var totalTime = timePerPiece * subBatch.Quantity;
+
+                // Не позволяем плановому времени быть меньше 0.01 часа (36 секунд)
+                var plannedTime = Math.Max(0.01m, totalTime);
+
                 var routeStage = new RouteStage
                 {
                     SubBatchId = subBatch.Id,
@@ -150,7 +157,7 @@ namespace ProductionSystem.Controllers
                     Name = operation.Name,
                     StageType = "Operation",
                     Order = operation.Order,
-                    PlannedTime = operation.TimePerPiece * subBatch.Quantity,
+                    PlannedTime = plannedTime,
                     Quantity = subBatch.Quantity,
                     Status = "Pending",
                     CreatedAt = ProductionContext.GetLocalNow()
@@ -161,6 +168,7 @@ namespace ProductionSystem.Controllers
 
             await _context.SaveChangesAsync();
         }
+
 
         [HttpPost]
         public async Task<IActionResult> StartOrder(int id)
@@ -178,17 +186,60 @@ namespace ProductionSystem.Controllers
             return RedirectToAction(nameof(Details), new { id });
         }
 
-
         [HttpPost]
         public async Task<IActionResult> CompleteOrder(int id)
         {
             try
             {
-                var order = await _context.ProductionOrders.FindAsync(id);
+                var order = await _context.ProductionOrders
+                    .Include(o => o.SubBatches)
+                    .ThenInclude(sb => sb.RouteStages)
+                    .FirstOrDefaultAsync(o => o.Id == id);
+
                 if (order != null && order.Status == "InProgress")
                 {
+                    // Автоматически завершаем все текущие операции
+                    foreach (var subBatch in order.SubBatches)
+                    {
+                        foreach (var stage in subBatch.RouteStages)
+                        {
+                            if (stage.Status == "InProgress" || stage.Status == "Paused")
+                            {
+                                // Получаем текущее выполнение
+                                var execution = await _context.StageExecutions
+                                    .Where(se => se.RouteStageId == stage.Id &&
+                                          (se.Status == "Started" || se.Status == "Paused"))
+                                    .FirstOrDefaultAsync();
+
+                                if (execution != null)
+                                {
+                                    // Вычисляем фактическое время
+                                    var endTime = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                                    var totalTime = endTime - execution.StartedAt!.Value;
+                                    decimal actualHours = (decimal)totalTime.TotalHours;
+
+                                    if (execution.PauseTime.HasValue)
+                                        actualHours -= execution.PauseTime.Value;
+
+                                    // Завершаем выполнение
+                                    execution.Status = "Completed";
+                                    execution.CompletedAt = endTime;
+                                    execution.ActualTime = Math.Round(actualHours, 2);
+                                    execution.Notes = (execution.Notes ?? "") + " Автоматически завершено при закрытии задания.";
+
+                                    // Обновляем статус этапа
+                                    stage.Status = "Completed";
+                                }
+                            }
+                        }
+
+                        // Обновляем статус подпартии
+                        subBatch.Status = "Completed";
+                        subBatch.CompletedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                    }
+
+                    // Обновляем статус основного задания
                     order.Status = "Completed";
-                    // ИСПРАВЛЕНИЕ: убираем Kind из DateTime
                     order.CompletedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
 
                     await _context.SaveChangesAsync();
@@ -207,7 +258,6 @@ namespace ProductionSystem.Controllers
 
             return RedirectToAction(nameof(Details), new { id });
         }
-
 
         public async Task<IActionResult> Delete(int? id)
         {

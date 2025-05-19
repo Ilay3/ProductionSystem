@@ -195,5 +195,97 @@ namespace ProductionSystem.Controllers
 
             return BadRequest("Unsupported format");
         }
+
+        // ProductionSystem/Controllers/ReportsController.cs - обновляем метод
+        public async Task<IActionResult> MachineDailyReport(DateTime? startDate, DateTime? endDate, int? machineId)
+        {
+            startDate = startDate?.Date ?? DateTime.Today.AddDays(-7);
+            endDate = endDate?.Date.AddDays(1) ?? DateTime.Today.AddDays(1);
+
+            var startUtc = startDate.Value.ToUniversalTime();
+            var endUtc = endDate.Value.ToUniversalTime();
+
+            var query = _context.StageExecutions
+                .Include(se => se.RouteStage)
+                .ThenInclude(rs => rs.SubBatch)
+                .ThenInclude(sb => sb.ProductionOrder)
+                .Include(se => se.Machine)
+                .Where(se => se.CompletedAt >= startUtc && se.CompletedAt <= endUtc && se.Status == "Completed");
+
+            if (machineId.HasValue)
+            {
+                query = query.Where(se => se.MachineId == machineId.Value);
+            }
+
+            var executions = await query.ToListAsync();
+
+            // Группируем по дням
+            var dailyReport = executions
+                .GroupBy(se => se.CompletedAt?.Date)
+                .Select(g => new
+                {
+                    Date = g.Key,
+                    TotalOperations = g.Count(se => se.RouteStage.StageType == "Operation"),
+                    TotalChangeovers = g.Count(se => se.RouteStage.StageType == "Changeover"),
+                    TotalProductionTime = g.Where(se => se.RouteStage.StageType == "Operation").Sum(se => se.ActualTime ?? 0),
+                    TotalChangeoverTime = g.Where(se => se.RouteStage.StageType == "Changeover").Sum(se => se.ActualTime ?? 0),
+                    MachineStats = g.GroupBy(se => se.Machine?.Name ?? "Не назначен")
+                        .Select(mg => new
+                        {
+                            Machine = mg.Key,
+                            Operations = mg.Count(se => se.RouteStage.StageType == "Operation"),
+                            Changeovers = mg.Count(se => se.RouteStage.StageType == "Changeover"),
+                            ProductionTime = mg.Where(se => se.RouteStage.StageType == "Operation").Sum(se => se.ActualTime ?? 0),
+                            ChangeoverTime = mg.Where(se => se.RouteStage.StageType == "Changeover").Sum(se => se.ActualTime ?? 0)
+                        }).OrderByDescending(x => x.ProductionTime).ToList()
+                })
+                .OrderBy(x => x.Date)
+                .ToList();
+
+            // Вычисляем статистику по станкам заранее - перенос логики из представления в контроллер
+            var machineStats = new List<object>();
+            if (dailyReport.Any())
+            {
+                var machines = dailyReport
+                    .SelectMany(d => d.MachineStats)
+                    .Select(m => m.Machine)
+                    .Distinct()
+                    .ToList();
+
+                foreach (var machine in machines)
+                {
+                    decimal totalProduction = 0;
+                    decimal totalChangeover = 0;
+
+                    foreach (var day in dailyReport)
+                    {
+                        var machineStat = day.MachineStats.FirstOrDefault(m => m.Machine == machine);
+                        if (machineStat != null)
+                        {
+                            totalProduction += machineStat.ProductionTime;
+                            totalChangeover += machineStat.ChangeoverTime;
+                        }
+                    }
+
+                    machineStats.Add(new
+                    {
+                        Machine = machine,
+                        TotalProduction = totalProduction,
+                        TotalChangeover = totalChangeover,
+                        TotalDays = dailyReport.Count
+                    });
+                }
+            }
+
+            ViewBag.DailyReport = dailyReport;
+            ViewBag.MachineStats = machineStats; // Передаем предварительно вычисленные данные
+            ViewBag.StartDate = startDate;
+            ViewBag.EndDate = endDate.Value.AddDays(-1);
+            ViewBag.MachineId = machineId;
+            ViewBag.Machines = await _context.Machines.Select(m => new { m.Id, m.Name }).ToListAsync();
+
+            return View();
+        }
+
     }
 }

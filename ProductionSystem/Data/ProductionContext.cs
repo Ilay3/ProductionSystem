@@ -57,6 +57,8 @@ namespace ProductionSystem.Data
         public DbSet<RouteStage> RouteStages { get; set; }
         public DbSet<StageExecution> StageExecutions { get; set; }
         public DbSet<ExecutionLog> ExecutionLogs { get; set; }
+        public DbSet<Shift> Shifts { get; set; }
+        public DbSet<ShiftAssignment> ShiftAssignments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -74,6 +76,25 @@ namespace ProductionSystem.Data
                     }
                 }
             }
+
+            modelBuilder.Entity<Shift>(entity =>
+            {
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(50);
+            });
+
+            modelBuilder.Entity<ShiftAssignment>(entity =>
+            {
+                entity.HasOne(e => e.Machine)
+                    .WithMany()
+                    .HasForeignKey(e => e.MachineId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(e => e.Shift)
+                    .WithMany(e => e.ShiftAssignments)
+                    .HasForeignKey(e => e.ShiftId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
 
             // Конфигурация Detail
             modelBuilder.Entity<Detail>(entity =>
@@ -250,7 +271,7 @@ namespace ProductionSystem.Data
         // Методы для получения текущего времени в UTC+4
         public static DateTime GetLocalNow()
         {
-            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, LocalTimeZone);
+            return DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
         }
 
         public static DateTime ConvertToLocalTime(DateTime utcTime)
@@ -263,7 +284,7 @@ namespace ProductionSystem.Data
 
         public static DateTime ConvertToUtcTime(DateTime localTime)
         {
-            return ConvertToUtc(localTime);
+            return DateTime.SpecifyKind(ConvertToUtc(localTime), DateTimeKind.Unspecified);
         }
     }
 }

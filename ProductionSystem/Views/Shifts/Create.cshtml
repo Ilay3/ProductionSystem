@@ -1,0 +1,94 @@
+﻿@model ProductionSystem.Models.Shift
+
+@{
+    ViewData["Title"] = "Создание смены";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <form asp-action="Create">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="form-group">
+                <label asp-for="Name" class="control-label">Название</label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="StartTime" class="control-label">Время начала</label>
+                <input asp-for="StartTime" class="form-control" type="time" />
+                <span asp-validation-for="StartTime" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="EndTime" class="control-label">Время окончания</label>
+                <input asp-for="EndTime" class="form-control" type="time" />
+                <span asp-validation-for="EndTime" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="BreakStartTime" class="control-label">Начало перерыва</label>
+                <input asp-for="BreakStartTime" class="form-control" type="time" />
+                <span asp-validation-for="BreakStartTime" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="BreakEndTime" class="control-label">Конец перерыва</label>
+                <input asp-for="BreakEndTime" class="form-control" type="time" />
+                <span asp-validation-for="BreakEndTime" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label class="control-label">Рабочие дни</label>
+                <div class="form-check">
+                    <input asp-for="Monday" class="form-check-input" />
+                    <label asp-for="Monday" class="form-check-label">Понедельник</label>
+                </div>
+                <div class="form-check">
+                    <input asp-for="Tuesday" class="form-check-input" />
+                    <label asp-for="Tuesday" class="form-check-label">Вторник</label>
+                </div>
+                <div class="form-check">
+                    <input asp-for="Wednesday" class="form-check-input" />
+                    <label asp-for="Wednesday" class="form-check-label">Среда</label>
+                </div>
+                <div class="form-check">
+                    <input asp-for="Thursday" class="form-check-input" />
+                    <label asp-for="Thursday" class="form-check-label">Четверг</label>
+                </div>
+                <div class="form-check">
+                    <input asp-for="Friday" class="form-check-input" />
+                    <label asp-for="Friday" class="form-check-label">Пятница</label>
+                </div>
+                <div class="form-check">
+                    <input asp-for="Saturday" class="form-check-input" />
+                    <label asp-for="Saturday" class="form-check-label">Суббота</label>
+                </div>
+                <div class="form-check">
+                    <input asp-for="Sunday" class="form-check-input" />
+                    <label asp-for="Sunday" class="form-check-label">Воскресенье</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Description" class="control-label">Описание</label>
+                <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <input type="submit" value="Создать" class="btn btn-primary" />
+                <a asp-action="Index" class="btn btn-secondary">Назад к списку</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

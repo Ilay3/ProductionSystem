@@ -37,7 +37,6 @@
                         }
                         @if (Model.CompletedAt.HasValue)
                         {
-                            <p><strong>Завершено:</strong> @Model.CompletedAt.Value.ToString("dd.MM.yyyy HH:mm:ss")</p>
                             <p>
                                 <strong>Фактическое время:</strong>
                                 @{
@@ -64,19 +63,23 @@
                         }
                         else if (ViewBag.CurrentTime != null)
                         {
-                          
                             var currentTimeValue = (double)ViewBag.CurrentTime;
-                            
-                            <p><strong>Текущее время:</strong> @currentTimeValue.ToString("F2") ч</p>
+                            var plannedTime = (double)Model.RouteStage.PlannedTime;
+                            var percentage = Math.Min(100, (currentTimeValue / plannedTime) * 100);
+
+                            <p><strong>Текущее время:</strong> @currentTimeValue.ToString("F2") ч из @plannedTime.ToString("F2") ч</p>
+                            <div class="progress mb-3">
+                                <div class="progress-bar @(percentage > 100 ? "bg-danger" : "bg-primary")"
+                                     role="progressbar"
+                                     style="width: @percentage%;"
+                                     aria-valuenow="@percentage"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100">
+                                    @percentage.ToString("F0")%
+                                </div>
+                            </div>
                         }
-                        @if (Model.PauseTime.HasValue && Model.PauseTime > 0)
-                        {
-                            <p><strong>Время пауз:</strong> @Model.PauseTime.Value.ToString("F2") ч</p>
-                        }
-                        @if (!string.IsNullOrEmpty(Model.Notes))
-                        {
-                            <p><strong>Заметки:</strong> @Model.Notes</p>
-                        }
+
                     </div>
                 </div>
             </div>

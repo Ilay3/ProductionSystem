@@ -1,6 +1,9 @@
 ﻿@{
     ViewData["Title"] = "Диаграмма Ганта";
 }
+@section Styles {
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gantt-chart@0.2.2/dist/gantt-chart.min.css">
+}
 
 <style>
     /* Стили для диаграммы Ганта */
@@ -413,7 +416,7 @@
             });
     }
 
-    function drawGanttChart(data) {
+        function drawGanttChart(data) {
         const ganttData = new google.visualization.DataTable();
 
         // Правильная структура для диаграммы Ганта
@@ -461,30 +464,30 @@
                     fontSize: 12,
                     color: '#333'
                 },
-                // Цвета по статусам
+                // Исправленная цветовая палитра по статусам
                 palette: [
                     {
-                        "color": "#e7e7e7", // Pending
-                        "dark": "#d0d0d0",
-                        "light": "#f0f0f0"
+                        "color": "#17a2b8", // Ready - голубой
+                        "dark": "#138496",
+                        "light": "#5bc0de"
                     },
                     {
-                        "color": "#0d6efd", // InProgress
+                        "color": "#0d6efd", // InProgress - синий
                         "dark": "#0a58ca",
                         "light": "#6ea8fe"
                     },
                     {
-                        "color": "#ffc107", // Paused
+                        "color": "#ffc107", // Paused/Waiting - желтый
                         "dark": "#ffb000",
                         "light": "#ffda6a"
                     },
                     {
-                        "color": "#198754", // Completed
+                        "color": "#198754", // Completed - зеленый
                         "dark": "#146c43",
                         "light": "#75b798"
                     },
                     {
-                        "color": "#6c757d", // Changeover
+                        "color": "#6c757d", // Changeover - серый
                         "dark": "#5a5a5a",
                         "light": "#8e8e8e"
                     }
@@ -507,6 +510,7 @@
 
         ganttChart.draw(ganttData, options);
     }
+
 
     function parseDate(dateString) {
         if (!dateString) return new Date();
@@ -567,50 +571,69 @@
     }
 
     // Автоматическое управление
-    function processAutomaticExecution() {
-        const button = document.getElementById('processAutomation');
-        const status = document.getElementById('automationStatus');
+function processAutomaticExecution() {
+    const button = document.getElementById('processAutomation');
+    const status = document.getElementById('automationStatus');
 
-        button.disabled = true;
-        button.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Обработка...';
+    button.disabled = true;
+    button.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Обработка...';
 
-        fetch('/api/Automation/process', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                status.textContent = 'Автоматика выполнена';
-                status.className = 'badge bg-success ms-3';
-                updateGantt(); // Обновляем диаграмму
-                showToast('Автоматическая обработка выполнена успешно', 'success');
-            } else {
-                status.textContent = 'Ошибка автоматики';
-                status.className = 'badge bg-danger ms-3';
-                showToast('Ошибка: ' + data.message, 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error processing automation:', error);
-            status.textContent = 'Ошибка связи';
+    fetch('/Gantt/ProcessAutomaticExecution', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            status.textContent = 'Автоматика выполнена';
+            status.className = 'badge bg-success ms-3';
+            updateGantt(); // Обновляем диаграмму
+            showToast('Автоматическая обработка выполнена успешно', 'success');
+        } else {
+            status.textContent = 'Ошибка автоматики';
             status.className = 'badge bg-danger ms-3';
-            showToast('Ошибка связи с сервером', 'error');
-        })
-        .finally(() => {
-            button.disabled = false;
-            button.innerHTML = '<i class="fas fa-play"></i> Запустить автоматику';
-        });
-    }
+            showToast('Ошибка: ' + data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error processing automation:', error);
+        status.textContent = 'Ошибка связи';
+        status.className = 'badge bg-danger ms-3';
+        showToast('Ошибка связи с сервером', 'error');
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-play"></i> Запустить автоматику';
+    });
+}
+
 
     // Управление очередями
-    function showQueueManagement() {
-        fetch('/Gantt/GetMachineQueue/' + document.getElementById('machineFilter').value)
-            .then(response => response.json())
+        function showQueueManagement() {
+        const machineId = document.getElementById('machineFilter').value;
+
+        if (!machineId) {
+            showToast('Пожалуйста, выберите станок в фильтре', 'warning');
+            return;
+        }
+
+        console.log('Запрос очереди для станка:', machineId);
+
+        // Используем правильный URL для MVC
+        fetch(`/Gantt/GetMachineQueue?id=${machineId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('Получены данные очереди:', data);
+
+                if (!data.success) {
+                    showToast('Ошибка: ' + data.message, 'error');
+                    return;
+                }
+
                 let html = `<h6>Очередь для станка: ${data.machine}</h6>`;
                 if (data.queue && data.queue.length > 0) {
                     html += '<table class="table table-sm">';
@@ -638,17 +661,28 @@
             })
             .catch(error => {
                 console.error('Error loading queue:', error);
-                showToast('Ошибка загрузки очереди', 'error');
+                showToast('Ошибка загрузки очереди: ' + error.message, 'error');
             });
     }
 
+
     // Действия с этапом
-    function showStageActions(stageData) {
+        function showStageActions(stageData) {
         selectedStageId = stageData.stageId;
 
-        fetch(`/Gantt/GetStageInfo/${stageData.stageId}`)
-            .then(response => response.json())
+        console.log('Запрос информации об этапе:', stageData.stageId);
+
+        // Используем правильный URL для MVC
+        fetch(`/Gantt/GetStageInfo?id=${stageData.stageId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('Получены данные этапа:', data);
+                // Остальной код без изменений
                 let infoHtml = `
                     <div class="row">
                         <div class="col-12">
@@ -702,13 +736,16 @@
             })
             .catch(error => {
                 console.error('Error loading stage info:', error);
-                showToast('Ошибка загрузки информации об этапе', 'error');
+                showToast('Ошибка загрузки информации об этапе: ' + error.message, 'error');
             });
     }
 
+
     // Функции управления этапами
-    function addToQueue(stageId) {
-        fetch(`/Gantt/AddStageToQueue/${stageId}`, { method: 'POST' })
+        function addToQueue(stageId) {
+        console.log('Добавление в очередь этапа:', stageId);
+
+        fetch(`/Gantt/AddStageToQueue?id=${stageId}`, { method: 'POST' })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -726,7 +763,9 @@
     }
 
     function removeFromQueue(stageId) {
-        fetch(`/Gantt/RemoveStageFromQueue/${stageId}`, { method: 'POST' })
+        console.log('Удаление из очереди этапа:', stageId);
+
+        fetch(`/Gantt/RemoveStageFromQueue?id=${stageId}`, { method: 'POST' })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
@@ -744,22 +783,16 @@
             });
     }
 
-    function releaseMachine(machineId) {
-        const reason = prompt('Укажите причину освобождения станка:');
-        if (!reason) return;
 
-        fetch('/Gantt/ReleaseMachine', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val()
-            },
-            body: JSON.stringify({
-                machineId: machineId,
-                urgentStageId: selectedStageId,
-                reason: reason
-            })
-        })
+    function releaseMachine(machineId) {
+    const reason = prompt('Укажите причину освобождения станка:');
+    if (!reason) return;
+
+    console.log('Освобождение станка:', machineId, 'для этапа:', selectedStageId);
+
+    const url = `/Gantt/ReleaseMachine?machineId=${machineId}&urgentStageId=${selectedStageId}&reason=${encodeURIComponent(reason)}`;
+
+    fetch(url, { method: 'POST' })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -774,7 +807,7 @@
             console.error('Error releasing machine:', error);
             showToast('Ошибка освобождения станка', 'error');
         });
-    }
+
 
     // Вспомогательные функции
     function getStatusBadgeClass(status) {

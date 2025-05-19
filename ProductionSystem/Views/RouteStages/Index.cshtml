@@ -3,6 +3,15 @@
 @{
     ViewData["Title"] = "Маршрут производства";
 }
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">@TempData["Error"]</div>
+}
+
+@if (TempData["Message"] != null)
+{
+    <div class="alert alert-success">@TempData["Message"]</div>
+}
 
 <div class="row">
     <div class="col-md-12">

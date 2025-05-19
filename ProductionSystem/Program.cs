@@ -21,6 +21,8 @@ builder.Services.AddDbContext<ProductionContext>(options =>
 // Регистрация сервисов
 builder.Services.AddScoped<IStageAssignmentService, StageAssignmentService>();
 builder.Services.AddScoped<IStageAutomationService, StageAutomationService>();
+builder.Services.AddScoped<IShiftService, ShiftService>();
+
 
 // Регистрация фонового сервиса автоматизации
 builder.Services.AddHostedService<StageAutomationBackgroundService>();

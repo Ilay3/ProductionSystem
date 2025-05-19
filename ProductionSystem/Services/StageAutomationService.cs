@@ -37,16 +37,21 @@ namespace ProductionSystem.Services
         private readonly ProductionContext _context;
         private readonly IStageAssignmentService _stageAssignmentService;
         private readonly ILogger<StageAutomationService> _logger;
+        private readonly IShiftService _shiftService;
+
 
         public StageAutomationService(
-            ProductionContext context,
-            IStageAssignmentService stageAssignmentService,
-            ILogger<StageAutomationService> logger)
+        ProductionContext context,
+        IStageAssignmentService stageAssignmentService,
+        IShiftService shiftService,
+        ILogger<StageAutomationService> logger)
         {
             _context = context;
             _stageAssignmentService = stageAssignmentService;
+            _shiftService = shiftService;
             _logger = logger;
         }
+
 
         public async Task ProcessAutomaticStageExecution()
         {
@@ -66,8 +71,17 @@ namespace ProductionSystem.Services
                     .ThenBy(rs => rs.Order) // Затем по порядку в маршруте
                     .ToListAsync();
 
+                // Проверяем рабочее время перед обработкой
+                var currentDateTime = ProductionContext.GetLocalNow();
                 foreach (var stage in readyStages)
                 {
+                    // Если есть назначенный станок, проверяем, работает ли он сейчас
+                    if (stage.MachineId.HasValue && !_shiftService.IsWorkingTime(currentDateTime, stage.MachineId))
+                    {
+                        _logger.LogInformation($"Skipping stage {stage.Id} as machine {stage.MachineId} is not in working shift");
+                        continue;
+                    }
+
                     await ProcessSingleStage(stage);
                 }
 
@@ -81,6 +95,7 @@ namespace ProductionSystem.Services
                 _logger.LogError(ex, "Error during automatic stage execution processing");
             }
         }
+
 
         private async Task ProcessSingleStage(RouteStage stage)
         {
@@ -153,6 +168,18 @@ namespace ProductionSystem.Services
 
             try
             {
+                // Проверяем, не занят ли станок другой операцией
+                var isStageRunningOnMachine = await _context.StageExecutions
+                    .AnyAsync(se => se.MachineId == machine.Id &&
+                                  (se.Status == "Started" || se.Status == "Paused"));
+
+                if (isStageRunningOnMachine)
+                {
+                    _logger.LogWarning($"Cannot start stage {stage.Id} - machine {machine.Id} is busy");
+                    await transaction.RollbackAsync();
+                    return;
+                }
+
                 // Проверяем, нужна ли переналадка
                 await CheckAndCreateChangeover(stage, machine);
 
@@ -188,6 +215,7 @@ namespace ProductionSystem.Services
                 throw;
             }
         }
+
 
         private async Task CheckAndCreateChangeover(RouteStage stage, Machine machine)
         {
@@ -256,16 +284,24 @@ namespace ProductionSystem.Services
 
         public async Task<bool> AddStageToQueue(int routeStageId)
         {
-            var stage = await _context.RouteStages.FindAsync(routeStageId);
+            var stage = await _context.RouteStages
+                .Include(rs => rs.Operation)
+                .FirstOrDefaultAsync(rs => rs.Id == routeStageId);
+
             if (stage == null || stage.Status != "Ready")
                 return false;
 
             stage.Status = "Waiting";
+
+            // Приоритезация (сохраняем текущее время для сортировки в очереди)
+            stage.PlannedStartDate = ProductionContext.GetLocalNow();
+
             await _context.SaveChangesAsync();
 
             _logger.LogInformation($"Stage {routeStageId} added to queue");
             return true;
         }
+
 
         public async Task<bool> RemoveStageFromQueue(int routeStageId)
         {
@@ -307,20 +343,25 @@ namespace ProductionSystem.Services
 
             foreach (var execution in activeExecutions)
             {
-                var elapsedTime = ProductionContext.GetLocalNow() - execution.StartedAt!.Value;
-                var remainingTime = execution.RouteStage.PlannedTime - (decimal)elapsedTime.TotalHours;
-
-                if (remainingTime > 0)
+                if (execution.StartedAt.HasValue)
                 {
-                    var estimatedEndTime = ProductionContext.GetLocalNow().AddHours((double)remainingTime);
-                    if (estimatedEndTime < earliestFreeTime)
-                        earliestFreeTime = estimatedEndTime;
+                    var elapsedTime = ProductionContext.GetLocalNow() - execution.StartedAt.Value;
+                    var remainingTime = execution.RouteStage.PlannedTime - (decimal)elapsedTime.TotalHours;
+
+                    if (remainingTime > 0)
+                    {
+                        var estimatedEndTime = ProductionContext.GetLocalNow().AddHours((double)remainingTime);
+                        if (estimatedEndTime < earliestFreeTime)
+                            earliestFreeTime = estimatedEndTime;
+                    }
                 }
             }
 
             return earliestFreeTime;
         }
 
+
+        // ProductionSystem/Services/StageAutomationService.cs - обновить метод
         public async Task<bool> ReleaseMachine(int machineId, int urgentStageId, string reason)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
@@ -330,8 +371,10 @@ namespace ProductionSystem.Services
                 // Находим текущее выполнение на станке
                 var currentExecution = await _context.StageExecutions
                     .Include(se => se.RouteStage)
+                    .Include(se => se.Machine)
+                    .ThenInclude(m => m.MachineType)
                     .FirstOrDefaultAsync(se => se.MachineId == machineId &&
-                                              (se.Status == "Started" || se.Status == "Paused"));
+                                            (se.Status == "Started" || se.Status == "Paused"));
 
                 if (currentExecution == null)
                     return false;
@@ -343,15 +386,24 @@ namespace ProductionSystem.Services
 
                 // Добавляем лог
                 await AddExecutionLog(currentExecution.Id, "Paused", "AUTO", reason);
-
                 await _context.SaveChangesAsync();
 
-                // Запускаем срочный этап
-                var urgentStage = await _context.RouteStages.FindAsync(urgentStageId);
-                if (urgentStage != null)
+                // Ищем ожидающие операции для этого типа станка
+                var machineTypeId = currentExecution.Machine?.MachineTypeId;
+                if (machineTypeId.HasValue)
                 {
-                    var machine = await _context.Machines.FindAsync(machineId);
-                    await AssignMachineAndStartStage(urgentStage, machine!);
+                    await StartWaitingStages(machineTypeId.Value);
+                }
+
+                // Запускаем срочный этап
+                if (urgentStageId > 0)
+                {
+                    var urgentStage = await _context.RouteStages.FindAsync(urgentStageId);
+                    if (urgentStage != null)
+                    {
+                        var machine = await _context.Machines.FindAsync(machineId);
+                        await AssignMachineAndStartStage(urgentStage, machine!);
+                    }
                 }
 
                 await transaction.CommitAsync();
@@ -366,33 +418,98 @@ namespace ProductionSystem.Services
                 return false;
             }
         }
-
-        private async Task ProcessStagesInQueue()
+        private async Task StartWaitingStages(int machineTypeId)
         {
-            var stagesInQueue = await _context.RouteStages
+            // Получаем все этапы в очереди для этого типа станка
+            var waitingStages = await _context.RouteStages
                 .Include(rs => rs.SubBatch)
                 .ThenInclude(sb => sb.ProductionOrder)
                 .Include(rs => rs.Operation)
-                .ThenInclude(o => o.MachineType)
-                .Where(rs => rs.Status == "Waiting")
+                .Where(rs => rs.Status == "Waiting" &&
+                            rs.Operation != null &&
+                            rs.Operation.MachineTypeId == machineTypeId)
                 .OrderBy(rs => rs.SubBatch.ProductionOrder.CreatedAt)
                 .ThenBy(rs => rs.Order)
                 .ToListAsync();
 
-            foreach (var stage in stagesInQueue)
+            foreach (var stage in waitingStages)
             {
-                // Проверяем, освободился ли подходящий станок
+                // Проверяем, что предыдущий этап завершен
+                if (!await IsPreviousStageCompleted(stage))
+                    continue;
+
+                // Получаем подходящие станки
                 var suitableMachines = await GetSuitableMachines(stage);
+
+                // Ищем свободный станок
                 var freeMachine = await FindFreeMachine(suitableMachines);
 
                 if (freeMachine != null)
                 {
-                    stage.Status = "Ready";
-                    await _context.SaveChangesAsync();
-                    await ProcessSingleStage(stage);
+                    // Назначаем станок и запускаем этап
+                    await AssignMachineAndStartStage(stage, freeMachine);
+                    break; // Запускаем только один этап за раз
                 }
             }
         }
+
+        private async Task ProcessStagesInQueue()
+        {
+            // Получаем список типов станков с освободившимися станками
+            var availableMachineTypes = await _context.Machines
+                .Where(m => !_context.StageExecutions.Any(se =>
+                    se.MachineId == m.Id && (se.Status == "Started" || se.Status == "Paused")))
+                .Select(m => m.MachineTypeId)
+                .Distinct()
+                .ToListAsync();
+
+            if (!availableMachineTypes.Any())
+                return;
+
+            foreach (var machineTypeId in availableMachineTypes)
+            {
+                // Получаем все этапы в очереди для этого типа станка
+                var waitingStages = await _context.RouteStages
+                    .Include(rs => rs.SubBatch)
+                    .ThenInclude(sb => sb.ProductionOrder)
+                    .Include(rs => rs.Operation)
+                    .Where(rs => rs.Status == "Waiting" &&
+                                rs.Operation != null &&
+                                rs.Operation.MachineTypeId == machineTypeId)
+                    .OrderBy(rs => rs.PlannedStartDate) // Сортировка по времени добавления в очередь
+                    .ToListAsync();
+
+                foreach (var stage in waitingStages)
+                {
+                    // Проверяем, что предыдущий этап завершен
+                    if (!await IsPreviousStageCompleted(stage))
+                        continue;
+
+                    // Получаем подходящие станки
+                    var suitableMachines = await GetSuitableMachines(stage);
+
+                    // Проверяем рабочее время для каждого станка
+                    var currentDateTime = ProductionContext.GetLocalNow();
+                    var availableMachines = suitableMachines
+                        .Where(m => _shiftService.IsWorkingTime(currentDateTime, m.Id))
+                        .ToList();
+
+                    // Ищем свободный станок
+                    var freeMachine = await FindFreeMachine(availableMachines);
+
+                    if (freeMachine != null)
+                    {
+                        stage.Status = "Ready"; // Переводим из Waiting в Ready
+                        await _context.SaveChangesAsync();
+
+                        // Назначаем станок и запускаем этап
+                        await AssignMachineAndStartStage(stage, freeMachine);
+                        break; // Запускаем только один этап за раз
+                    }
+                }
+            }
+        }
+
 
         private async Task AddExecutionLog(int executionId, string action, string operatorName, string notes)
         {

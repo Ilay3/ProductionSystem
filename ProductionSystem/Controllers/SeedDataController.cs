@@ -29,13 +29,13 @@ namespace ProductionSystem.Controllers
                 // 1. Создаем типы станков
                 var machineTypes = new[]
                 {
-                new MachineType { Name = "Токарный ЧПУ", Description = "Токарные станки с ЧПУ", CreatedAt = DateTime.UtcNow },
-                new MachineType { Name = "Фрезерный ЧПУ", Description = "Фрезерные станки с ЧПУ", CreatedAt = DateTime.UtcNow },
-                new MachineType { Name = "Сверлильный", Description = "Сверлильные станки", CreatedAt = DateTime.UtcNow },
-                new MachineType { Name = "Заточной", Description = "Заточные станки", CreatedAt = DateTime.UtcNow },
-                new MachineType { Name = "Термический", Description = "Термическая обработка", CreatedAt = DateTime.UtcNow },
-                new MachineType { Name = "Слесарный", Description = "Слесарные работы", CreatedAt = DateTime.UtcNow },
-                new MachineType { Name = "Контрольный", Description = "Контроль качества", CreatedAt = DateTime.UtcNow }
+                new MachineType { Name = "Токарный ЧПУ", Description = "Токарные станки с ЧПУ", CreatedAt = DateTime.SpecifyKind(DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), DateTimeKind.Unspecified) },
+                new MachineType { Name = "Фрезерный ЧПУ", Description = "Фрезерные станки с ЧПУ", CreatedAt = DateTime.SpecifyKind(DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), DateTimeKind.Unspecified) },
+                new MachineType { Name = "Сверлильный", Description = "Сверлильные станки", CreatedAt = DateTime.SpecifyKind(DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), DateTimeKind.Unspecified) },
+                new MachineType { Name = "Заточной", Description = "Заточные станки", CreatedAt = DateTime.SpecifyKind(DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), DateTimeKind.Unspecified) },
+                new MachineType { Name = "Термический", Description = "Термическая обработка", CreatedAt = DateTime.SpecifyKind(DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), DateTimeKind.Unspecified) },
+                new MachineType { Name = "Слесарный", Description = "Слесарные работы", CreatedAt = DateTime.SpecifyKind(DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), DateTimeKind.Unspecified) },
+                new MachineType { Name = "Контрольный", Description = "Контроль качества", CreatedAt = DateTime.SpecifyKind(DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), DateTimeKind.Unspecified) }
             };
 
                 _context.MachineTypes.AddRange(machineTypes);
@@ -45,31 +45,109 @@ namespace ProductionSystem.Controllers
                 var machines = new[]
                 {
                 // Токарные ЧПУ
-                new Machine { Name = "16К20", InventoryNumber = "16K20-01", MachineTypeId = machineTypes[0].Id, Priority = 1, CreatedAt = DateTime.UtcNow },
-                new Machine { Name = "HAAS ST-10", InventoryNumber = "ST-10", MachineTypeId = machineTypes[0].Id, Priority = 2, CreatedAt = DateTime.UtcNow },
-                new Machine { Name = "HAAS ST-20", InventoryNumber = "ST-20", MachineTypeId = machineTypes[0].Id, Priority = 3, CreatedAt = DateTime.UtcNow },
+                new Machine { Name = "16К20", InventoryNumber = "16K20-01", MachineTypeId = machineTypes[0].Id, Priority = 1, CreatedAt = DateTime.SpecifyKind(DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), DateTimeKind.Unspecified) },
+                new Machine { Name = "HAAS ST-10", InventoryNumber = "ST-10", MachineTypeId = machineTypes[0].Id, Priority = 2, CreatedAt = DateTime.SpecifyKind(DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), DateTimeKind.Unspecified) },
+                new Machine { Name = "HAAS ST-20", InventoryNumber = "ST-20", MachineTypeId = machineTypes[0].Id, Priority = 3, CreatedAt = DateTime.SpecifyKind(DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), DateTimeKind.Unspecified) },
                 
                 // Фрезерные ЧПУ  
-                new Machine { Name = "HAAS VF-2", InventoryNumber = "VF-2", MachineTypeId = machineTypes[1].Id, Priority = 1, CreatedAt = DateTime.UtcNow },
-                new Machine { Name = "HAAS VF-3", InventoryNumber = "VF-3", MachineTypeId = machineTypes[1].Id, Priority = 2, CreatedAt = DateTime.UtcNow },
+                new Machine { Name = "HAAS VF-2", InventoryNumber = "VF-2", MachineTypeId = machineTypes[1].Id, Priority = 1, CreatedAt = DateTime.SpecifyKind(DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), DateTimeKind.Unspecified) },
+                new Machine { Name = "HAAS VF-3", InventoryNumber = "VF-3", MachineTypeId = machineTypes[1].Id, Priority = 2, CreatedAt = DateTime.SpecifyKind(DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), DateTimeKind.Unspecified) },
                 
                 // Остальные типы станков
-                new Machine { Name = "Сверлильный-1", InventoryNumber = "DR-01", MachineTypeId = machineTypes[2].Id, Priority = 1, CreatedAt = DateTime.UtcNow },
-                new Machine { Name = "Заточной-1", InventoryNumber = "ZT-01", MachineTypeId = machineTypes[3].Id, Priority = 1, CreatedAt = DateTime.UtcNow },
-                new Machine { Name = "Термопечь-1", InventoryNumber = "TP-01", MachineTypeId = machineTypes[4].Id, Priority = 1, CreatedAt = DateTime.UtcNow },
-                new Machine { Name = "Слесарный участок", InventoryNumber = "SL-01", MachineTypeId = machineTypes[5].Id, Priority = 1, CreatedAt = DateTime.UtcNow },
-                new Machine { Name = "Контрольный участок", InventoryNumber = "KT-01", MachineTypeId = machineTypes[6].Id, Priority = 1, CreatedAt = DateTime.UtcNow }
+                new Machine { Name = "Сверлильный-1", InventoryNumber = "DR-01", MachineTypeId = machineTypes[2].Id, Priority = 1, CreatedAt = DateTime.SpecifyKind(DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified), DateTimeKind.Unspecified) },
+                new Machine { Name = "Заточной-1", InventoryNumber = "ZT-01", MachineTypeId = machineTypes[3].Id, Priority = 1, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Machine { Name = "Термопечь-1", InventoryNumber = "TP-01", MachineTypeId = machineTypes[4].Id, Priority = 1, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Machine { Name = "Слесарный участок", InventoryNumber = "SL-01", MachineTypeId = machineTypes[5].Id, Priority = 1, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Machine { Name = "Контрольный участок", InventoryNumber = "KT-01", MachineTypeId = machineTypes[6].Id, Priority = 1, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) }
             };
 
                 _context.Machines.AddRange(machines);
                 await _context.SaveChangesAsync();
 
+
+                var shifts = new[]
+{
+    new Shift {
+        Name = "1-я смена",
+        StartTime = new TimeSpan(8, 0, 0),
+        EndTime = new TimeSpan(17, 0, 0),
+        BreakStartTime = new TimeSpan(12, 0, 0),
+        BreakEndTime = new TimeSpan(13, 0, 0),
+        Monday = true, Tuesday = true, Wednesday = true, Thursday = true, Friday = true,
+        Saturday = false, Sunday = false,
+        CreatedAt = ProductionContext.GetLocalNow()
+    },
+    new Shift {
+        Name = "2-я смена",
+        StartTime = new TimeSpan(17, 0, 0),
+        EndTime = new TimeSpan(2, 0, 0),
+        BreakStartTime = new TimeSpan(21, 0, 0),
+        BreakEndTime = new TimeSpan(22, 0, 0),
+        Monday = true, Tuesday = true, Wednesday = true, Thursday = true, Friday = true,
+        Saturday = false, Sunday = false,
+        CreatedAt = ProductionContext.GetLocalNow()
+    },
+    new Shift {
+        Name = "3-я смена",
+        StartTime = new TimeSpan(2, 0, 0),
+        EndTime = new TimeSpan(8, 0, 0),
+        BreakStartTime = new TimeSpan(4, 0, 0),
+        BreakEndTime = new TimeSpan(5, 0, 0),
+        Monday = true, Tuesday = true, Wednesday = true, Thursday = true, Friday = true,
+        Saturday = false, Sunday = false,
+        CreatedAt = ProductionContext.GetLocalNow()
+    }
+};
+
+                _context.Shifts.AddRange(shifts);
+                await _context.SaveChangesAsync();
+
+                // Назначаем смены на станки
+                var shiftAssignments = new List<ShiftAssignment>();
+
+                // 1-я смена для всех станков
+                foreach (var machine in machines)
+                {
+                    shiftAssignments.Add(new ShiftAssignment
+                    {
+                        MachineId = machine.Id,
+                        ShiftId = shifts[0].Id,
+                        IsActive = true,
+                        CreatedAt = ProductionContext.GetLocalNow()
+                    });
+                }
+
+                // 2-я смена для некоторых станков
+                for (int i = 0; i < machines.Length; i += 2)
+                {
+                    shiftAssignments.Add(new ShiftAssignment
+                    {
+                        MachineId = machines[i].Id,
+                        ShiftId = shifts[1].Id,
+                        IsActive = true,
+                        CreatedAt = ProductionContext.GetLocalNow()
+                    });
+                }
+
+                // 3-я смена только для первого станка
+                shiftAssignments.Add(new ShiftAssignment
+                {
+                    MachineId = machines[0].Id,
+                    ShiftId = shifts[2].Id,
+                    IsActive = true,
+                    CreatedAt = ProductionContext.GetLocalNow()
+                });
+
+                _context.ShiftAssignments.AddRange(shiftAssignments);
+                await _context.SaveChangesAsync();
+    
+
                 // 3. Создаем детали из маршрутных карт
                 var details = new[]
                 {
-                new Detail { Name = "Втулка", Number = "43ТК.02.01.111-7", Description = "Втулка основная", CreatedAt = DateTime.UtcNow },
-                new Detail { Name = "Затвор", Number = "43ТК.02.01.112-9", Description = "Затвор клапана", CreatedAt = DateTime.UtcNow },
-                new Detail { Name = "Втулка Станка", Number = "43ТК.06.01.103-1", Description = "Втулка станка", CreatedAt = DateTime.UtcNow }
+                new Detail { Name = "Втулка", Number = "43ТК.02.01.111-7", Description = "Втулка основная", CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Detail { Name = "Затвор", Number = "43ТК.02.01.112-9", Description = "Затвор клапана", CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Detail { Name = "Втулка Станка", Number = "43ТК.06.01.103-1", Description = "Втулка станка", CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) }
             };
 
                 _context.Details.AddRange(details);
@@ -78,100 +156,100 @@ namespace ProductionSystem.Controllers
                 // 4. Создаем операции для ВТУЛКИ (43ТК.02.01.111-7)
                 var bushingOperations = new[]
                 {
-                new Operation { DetailId = details[0].Id, OperationNumber = "005", Name = "Заготовительная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.007m, Order = 5, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "010", Name = "ЧПУ", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.077m, Order = 10, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "015", Name = "Сверлениe", MachineTypeId = machineTypes[2].Id, TimePerPiece = 0.090m, Order = 15, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "020", Name = "Токарная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.038m, Order = 20, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "025", Name = "Т.К.", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.001m, Order = 25, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "030", Name = "Фрезерная", MachineTypeId = machineTypes[1].Id, TimePerPiece = 0.054m, Order = 30, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "035", Name = "Фрезерная", MachineTypeId = machineTypes[1].Id, TimePerPiece = 0.083m, Order = 35, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "040", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.117m, Order = 40, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "045", Name = "Т.К.", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.010m, Order = 45, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "050", Name = "За.Перех", MachineTypeId = machineTypes[3].Id, TimePerPiece = 0.157m, Order = 50, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "055", Name = "Токарная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.157m, Order = 55, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "060", Name = "Шлифовальная", MachineTypeId = machineTypes[3].Id, TimePerPiece = 0.157m, Order = 60, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "065", Name = "Слесарная ОТК", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.034m, Order = 65, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "070", Name = "Контроль", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.017m, Order = 70, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "075", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.005m, Order = 75, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "080", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.017m, Order = 80, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "085", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.005m, Order = 85, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "090", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.108m, Order = 90, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "095", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.064m, Order = 95, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "100", Name = "Контрольная", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.011m, Order = 100, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "105", Name = "МД", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.034m, Order = 105, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "110", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.005m, Order = 110, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "115", Name = "Навертка", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.008m, Order = 115, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "120", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.039m, Order = 120, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "125", Name = "Токарная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.028m, Order = 125, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "130", Name = "Фрезерная", MachineTypeId = machineTypes[1].Id, TimePerPiece = 0.112m, Order = 130, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "135", Name = "Навертка", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.008m, Order = 135, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "140", Name = "Шлифовальная", MachineTypeId = machineTypes[3].Id, TimePerPiece = 0.157m, Order = 140, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[0].Id, OperationNumber = "145", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.034m, Order = 145, CreatedAt = DateTime.UtcNow }
+                new Operation { DetailId = details[0].Id, OperationNumber = "005", Name = "Заготовительная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.007m, Order = 5, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "010", Name = "ЧПУ", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.077m, Order = 10, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "015", Name = "Сверлениe", MachineTypeId = machineTypes[2].Id, TimePerPiece = 0.090m, Order = 15, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "020", Name = "Токарная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.038m, Order = 20, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "025", Name = "Т.К.", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.001m, Order = 25, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "030", Name = "Фрезерная", MachineTypeId = machineTypes[1].Id, TimePerPiece = 0.054m, Order = 30, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "035", Name = "Фрезерная", MachineTypeId = machineTypes[1].Id, TimePerPiece = 0.083m, Order = 35, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "040", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.117m, Order = 40, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "045", Name = "Т.К.", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.010m, Order = 45, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "050", Name = "За.Перех", MachineTypeId = machineTypes[3].Id, TimePerPiece = 0.157m, Order = 50, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "055", Name = "Токарная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.157m, Order = 55, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "060", Name = "Шлифовальная", MachineTypeId = machineTypes[3].Id, TimePerPiece = 0.157m, Order = 60, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "065", Name = "Слесарная ОТК", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.034m, Order = 65, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "070", Name = "Контроль", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.017m, Order = 70, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "075", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.005m, Order = 75, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "080", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.017m, Order = 80, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "085", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.005m, Order = 85, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "090", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.108m, Order = 90, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "095", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.064m, Order = 95, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "100", Name = "Контрольная", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.011m, Order = 100, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "105", Name = "МД", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.034m, Order = 105, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "110", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.005m, Order = 110, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "115", Name = "Навертка", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.008m, Order = 115, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "120", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.039m, Order = 120, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "125", Name = "Токарная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.028m, Order = 125, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "130", Name = "Фрезерная", MachineTypeId = machineTypes[1].Id, TimePerPiece = 0.112m, Order = 130, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "135", Name = "Навертка", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.008m, Order = 135, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "140", Name = "Шлифовальная", MachineTypeId = machineTypes[3].Id, TimePerPiece = 0.157m, Order = 140, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[0].Id, OperationNumber = "145", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.034m, Order = 145, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) }
             };
 
                 // 5. Создаем операции для ЗАТВОРА (43ТК.02.01.112-9)
                 var valveOperations = new[]
                 {
-                new Operation { DetailId = details[1].Id, OperationNumber = "005", Name = "Заготовительная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.008m, Order = 5, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "010", Name = "ЧПУ", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.025m, Order = 10, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "015", Name = "020 Т.К.", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.074m, Order = 15, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "020", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.034m, Order = 20, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "025", Name = "Термическая", MachineTypeId = machineTypes[4].Id, TimePerPiece = 0.800m, Order = 25, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "030", Name = "Т.К.", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.014m, Order = 30, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "035", Name = "Фрезерная", MachineTypeId = machineTypes[1].Id, TimePerPiece = 0.028m, Order = 35, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "040", Name = "Фрезерная", MachineTypeId = machineTypes[1].Id, TimePerPiece = 0.017m, Order = 40, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "045", Name = "Контроль", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.042m, Order = 45, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "050", Name = "ЧПУ", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.071m, Order = 50, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "055", Name = "ЧПУ", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.037m, Order = 55, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "060", Name = "Токарная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.038m, Order = 60, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "065", Name = "Шлифовальная", MachineTypeId = machineTypes[3].Id, TimePerPiece = 0.124m, Order = 65, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "070", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.053m, Order = 70, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "075", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.017m, Order = 75, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "080", Name = "Т.К.", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.038m, Order = 80, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "085", Name = "1140Q", MachineTypeId = machineTypes[1].Id, TimePerPiece = 0.159m, Order = 85, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "090", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.030m, Order = 90, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "095", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.017m, Order = 95, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "100", Name = "Контрольная", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.040m, Order = 100, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "105", Name = "ЧПУ", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.048m, Order = 105, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "110", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.053m, Order = 110, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "115", Name = "Навертка", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.017m, Order = 115, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "120", Name = "Токарная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.022m, Order = 120, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "125", Name = "Контроль", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.032m, Order = 125, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "130", Name = "Токарная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.053m, Order = 130, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "135", Name = "Сборка", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.049m, Order = 135, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "140", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.138m, Order = 140, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "145", Name = "Испытания", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.408m, Order = 145, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "150", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.017m, Order = 150, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[1].Id, OperationNumber = "155", Name = "Контроль", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.058m, Order = 155, CreatedAt = DateTime.UtcNow }
+                new Operation { DetailId = details[1].Id, OperationNumber = "005", Name = "Заготовительная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.008m, Order = 5, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "010", Name = "ЧПУ", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.025m, Order = 10, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "015", Name = "020 Т.К.", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.074m, Order = 15, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "020", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.034m, Order = 20, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "025", Name = "Термическая", MachineTypeId = machineTypes[4].Id, TimePerPiece = 0.800m, Order = 25, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "030", Name = "Т.К.", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.014m, Order = 30, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "035", Name = "Фрезерная", MachineTypeId = machineTypes[1].Id, TimePerPiece = 0.028m, Order = 35, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "040", Name = "Фрезерная", MachineTypeId = machineTypes[1].Id, TimePerPiece = 0.017m, Order = 40, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "045", Name = "Контроль", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.042m, Order = 45, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "050", Name = "ЧПУ", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.071m, Order = 50, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "055", Name = "ЧПУ", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.037m, Order = 55, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "060", Name = "Токарная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.038m, Order = 60, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "065", Name = "Шлифовальная", MachineTypeId = machineTypes[3].Id, TimePerPiece = 0.124m, Order = 65, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "070", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.053m, Order = 70, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "075", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.017m, Order = 75, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "080", Name = "Т.К.", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.038m, Order = 80, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "085", Name = "1140Q", MachineTypeId = machineTypes[1].Id, TimePerPiece = 0.159m, Order = 85, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "090", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.030m, Order = 90, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "095", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.017m, Order = 95, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "100", Name = "Контрольная", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.040m, Order = 100, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "105", Name = "ЧПУ", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.048m, Order = 105, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "110", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.053m, Order = 110, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "115", Name = "Навертка", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.017m, Order = 115, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "120", Name = "Токарная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.022m, Order = 120, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "125", Name = "Контроль", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.032m, Order = 125, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "130", Name = "Токарная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.053m, Order = 130, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "135", Name = "Сборка", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.049m, Order = 135, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "140", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.138m, Order = 140, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "145", Name = "Испытания", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.408m, Order = 145, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "150", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.017m, Order = 150, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[1].Id, OperationNumber = "155", Name = "Контроль", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.058m, Order = 155, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) }
             };
 
                 // 6. Создаем операции для ВТУЛКИ СТАНКА (43ТК.06.01.103-1)
                 var machineBushingOperations = new[]
                 {
-                new Operation { DetailId = details[2].Id, OperationNumber = "010", Name = "Заготовительная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.647m, Order = 10, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "015", Name = "Токарная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.60m, Order = 15, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "020", Name = "16К20", MachineTypeId = machineTypes[0].Id, TimePerPiece = 3.0m, Order = 20, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "025", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.170m, Order = 25, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "030", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.028m, Order = 30, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "035", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.04m, Order = 35, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "040", Name = "За.Перех", MachineTypeId = machineTypes[3].Id, TimePerPiece = 0.018m, Order = 40, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "045", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.040m, Order = 45, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "050", Name = "Контроль", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.100m, Order = 50, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "055", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.050m, Order = 55, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "060", Name = "Термическая", MachineTypeId = machineTypes[4].Id, TimePerPiece = 0.270m, Order = 60, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "065", Name = "16К20", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.640m, Order = 65, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "070", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.065m, Order = 70, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "075", Name = "Шлифовальная", MachineTypeId = machineTypes[3].Id, TimePerPiece = 1.018m, Order = 75, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "080", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.031m, Order = 80, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "085", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.028m, Order = 85, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "090", Name = "Навертка", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.028m, Order = 90, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "095", Name = "1000Q", MachineTypeId = machineTypes[1].Id, TimePerPiece = 1.000m, Order = 95, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "100", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.1m, Order = 100, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "105", Name = "Контроль", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.081m, Order = 105, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "110", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.008m, Order = 110, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "115", Name = "Навертка", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.008m, Order = 115, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "120", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.028m, Order = 120, CreatedAt = DateTime.UtcNow },
-                new Operation { DetailId = details[2].Id, OperationNumber = "125", Name = "Контроль", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.01m, Order = 125, CreatedAt = DateTime.UtcNow }
+                new Operation { DetailId = details[2].Id, OperationNumber = "010", Name = "Заготовительная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.647m, Order = 10, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "015", Name = "Токарная", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.60m, Order = 15, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "020", Name = "16К20", MachineTypeId = machineTypes[0].Id, TimePerPiece = 3.0m, Order = 20, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "025", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.170m, Order = 25, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "030", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.028m, Order = 30, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "035", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.04m, Order = 35, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "040", Name = "За.Перех", MachineTypeId = machineTypes[3].Id, TimePerPiece = 0.018m, Order = 40, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "045", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.040m, Order = 45, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "050", Name = "Контроль", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.100m, Order = 50, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "055", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.050m, Order = 55, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "060", Name = "Термическая", MachineTypeId = machineTypes[4].Id, TimePerPiece = 0.270m, Order = 60, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "065", Name = "16К20", MachineTypeId = machineTypes[0].Id, TimePerPiece = 0.640m, Order = 65, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "070", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.065m, Order = 70, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "075", Name = "Шлифовальная", MachineTypeId = machineTypes[3].Id, TimePerPiece = 1.018m, Order = 75, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "080", Name = "ОТК", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.031m, Order = 80, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "085", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.028m, Order = 85, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "090", Name = "Навертка", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.028m, Order = 90, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "095", Name = "1000Q", MachineTypeId = machineTypes[1].Id, TimePerPiece = 1.000m, Order = 95, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "100", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.1m, Order = 100, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "105", Name = "Контроль", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.081m, Order = 105, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "110", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.008m, Order = 110, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "115", Name = "Навертка", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.008m, Order = 115, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "120", Name = "Слесарная", MachineTypeId = machineTypes[5].Id, TimePerPiece = 0.028m, Order = 120, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) },
+                new Operation { DetailId = details[2].Id, OperationNumber = "125", Name = "Контроль", MachineTypeId = machineTypes[6].Id, TimePerPiece = 0.01m, Order = 125, CreatedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified) }
             };
 
                 _context.Operations.AddRange(bushingOperations);
@@ -234,6 +312,8 @@ namespace ProductionSystem.Controllers
             _context.ProductionOrders.RemoveRange(_context.ProductionOrders);
             _context.Changeovers.RemoveRange(_context.Changeovers);
             _context.Operations.RemoveRange(_context.Operations);
+            _context.ShiftAssignments.RemoveRange(_context.ShiftAssignments);
+            _context.Shifts.RemoveRange(_context.Shifts);
             _context.Machines.RemoveRange(_context.Machines);
             _context.Details.RemoveRange(_context.Details);
             _context.MachineTypes.RemoveRange(_context.MachineTypes);

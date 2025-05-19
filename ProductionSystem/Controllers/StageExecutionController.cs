@@ -62,6 +62,20 @@ namespace ProductionSystem.Controllers
                 return RedirectToAction("Index", "RouteStages", new { subBatchId = routeStage.SubBatchId });
             }
 
+            // ДОБАВЛЕННАЯ ПРОВЕРКА: Проверяем, не занят ли станок другой операцией
+            if (routeStage.MachineId.HasValue)
+            {
+                var isStageRunningOnMachine = await _context.StageExecutions
+                    .AnyAsync(se => se.MachineId == routeStage.MachineId &&
+                                  (se.Status == "Started" || se.Status == "Paused"));
+
+                if (isStageRunningOnMachine)
+                {
+                    TempData["Error"] = "Станок занят выполнением другой операции";
+                    return RedirectToAction("Index", "RouteStages", new { subBatchId = routeStage.SubBatchId });
+                }
+            }
+
             // Создаем выполнение этапа
             var execution = new StageExecution
             {
@@ -86,6 +100,7 @@ namespace ProductionSystem.Controllers
             TempData["Message"] = "Этап успешно запущен";
             return RedirectToAction("Details", new { id = execution.Id });
         }
+
 
         [HttpPost]
         public async Task<IActionResult> PauseStage(int id)
@@ -178,13 +193,31 @@ namespace ProductionSystem.Controllers
 
             try
             {
-                // Вычисляем общее время выполнения
-                var totalTime = DateTime.UtcNow - execution.StartedAt!.Value;
-                execution.ActualTime = (decimal)totalTime.TotalHours - (execution.PauseTime ?? 0);
+                // ИСПРАВЛЕНИЕ: Вычисляем точное фактическое время выполнения в минутах, конвертируем в часы
+                var actualMinutes = 0.0;
+
+                if (execution.StartedAt.HasValue)
+                {
+                    // Если операция на паузе, считаем до времени паузы, иначе до текущего времени
+                    var endTime = execution.Status == "Paused" && execution.PausedAt.HasValue
+                                ? execution.PausedAt.Value
+                                : ProductionContext.GetLocalNow();
+
+                    var totalTimeSpan = endTime - execution.StartedAt.Value;
+                    actualMinutes = totalTimeSpan.TotalMinutes;
+
+                    // Вычитаем время пауз
+                    if (execution.PauseTime.HasValue)
+                    {
+                        actualMinutes -= (double)(execution.PauseTime * 60); // Конвертируем часы в минуты
+                    }
+                }
+
+                // Преобразуем минуты в часы и округляем до 2 знаков
+                execution.ActualTime = Math.Round((decimal)(actualMinutes / 60.0), 2);
 
                 execution.Status = "Completed";
-                // ИСПРАВЛЕНИЕ: убираем Kind из DateTime
-                execution.CompletedAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+                execution.CompletedAt = ProductionContext.GetLocalNow();
                 execution.Notes = notes;
 
                 // Проверяем превышение времени
@@ -214,6 +247,7 @@ namespace ProductionSystem.Controllers
 
             return RedirectToAction("Index", "RouteStages", new { subBatchId = execution.RouteStage.SubBatchId });
         }
+
 
         [HttpPost]
         public async Task<IActionResult> UpdateActualTime(int id, decimal actualTime, string? reason)

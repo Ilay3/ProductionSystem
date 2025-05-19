@@ -1,0 +1,110 @@
+﻿@model ProductionSystem.Models.Shift
+
+@{
+    ViewData["Title"] = "Детали смены";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>Информация о смене</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">Название</dt>
+                    <dd class="col-sm-9">@Model.Name</dd>
+
+                    <dt class="col-sm-3">Время начала</dt>
+                    <dd class="col-sm-9">@Model.StartTime.ToString(@"hh\:mm")</dd>
+
+                    <dt class="col-sm-3">Время окончания</dt>
+                    <dd class="col-sm-9">@Model.EndTime.ToString(@"hh\:mm")</dd>
+
+                    @if (Model.BreakStartTime.HasValue && Model.BreakEndTime.HasValue)
+                    {
+                        <dt class="col-sm-3">Перерыв</dt>
+                        <dd class="col-sm-9">@Model.BreakStartTime.Value.ToString(@"hh\:mm") - @Model.BreakEndTime.Value.ToString(@"hh\:mm")</dd>
+                    }
+
+                    <dt class="col-sm-3">Рабочие дни</dt>
+                    <dd class="col-sm-9">
+                        @{
+                            var days = new List<string>();
+                            if (Model.Monday) days.Add("Понедельник");
+                            if (Model.Tuesday) days.Add("Вторник");
+                            if (Model.Wednesday) days.Add("Среда");
+                            if (Model.Thursday) days.Add("Четверг");
+                            if (Model.Friday) days.Add("Пятница");
+                            if (Model.Saturday) days.Add("Суббота");
+                            if (Model.Sunday) days.Add("Воскресенье");
+                        }
+                        @string.Join(", ", days)
+                    </dd>
+
+                    @if (!string.IsNullOrEmpty(Model.Description))
+                    {
+                        <dt class="col-sm-3">Описание</dt>
+                        <dd class="col-sm-9">@Model.Description</dd>
+                    }
+
+                    <dt class="col-sm-3">Создана</dt>
+                    <dd class="col-sm-9">@Model.CreatedAt.ToString("dd.MM.yyyy HH:mm")</dd>
+                </dl>
+            </div>
+        </div>
+
+        @if (Model.ShiftAssignments.Any())
+        {
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5>Назначенные станки</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Станок</th>
+                                <th>Инвентарный номер</th>
+                                <th>Активен</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var assignment in Model.ShiftAssignments)
+                            {
+                                <tr>
+                                    <td>@assignment.Machine.Name</td>
+                                    <td>@assignment.Machine.InventoryNumber</td>
+                                    <td>
+                                        @if (assignment.IsActive)
+                                        {
+                                            <span class="badge bg-success">Да</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Нет</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info mt-3">
+                Нет назначенных станков для этой смены.
+            </div>
+        }
+
+        <div class="mt-3">
+            <a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-primary">Редактировать</a>
+            <a asp-action="AssignMachines" asp-route-id="@Model.Id" class="btn btn-success">Назначить станки</a>
+            <a asp-action="Index" class="btn btn-secondary">Назад к списку</a>
+        </div>
+    </div>
+</div>
