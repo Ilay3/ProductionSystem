@@ -148,10 +148,10 @@ namespace ProductionSystem.Services
         {
             foreach (var machine in machines)
             {
-                // Проверяем, есть ли активные выполнения на этом станке
+                // Изменено! Теперь станок считается занятым, только если на нем есть активные операции в статусе "Started"
+                // Если операция на паузе (Paused), станок считается доступным для новых операций
                 var hasActiveExecution = await _context.StageExecutions
-                    .AnyAsync(se => se.MachineId == machine.Id &&
-                                  (se.Status == "Started" || se.Status == "Paused"));
+                    .AnyAsync(se => se.MachineId == machine.Id && se.Status == "Started");
 
                 if (!hasActiveExecution)
                 {

@@ -13,6 +13,11 @@
     <div class="alert alert-success">@TempData["Message"]</div>
 }
 
+@if (TempData["Warning"] != null)
+{
+    <div class="alert alert-warning">@Html.Raw(TempData["Warning"])</div>
+}
+
 <div class="row">
     <div class="col-md-12">
         @if (ViewBag.SubBatch != null)
@@ -24,12 +29,58 @@
                     <p><strong>Задание:</strong> @ViewBag.SubBatch.ProductionOrder.Number</p>
                     <p><strong>Количество:</strong> @ViewBag.SubBatch.Quantity шт.</p>
                     <p><strong>Статус:</strong> <span class="badge bg-info">@ViewBag.SubBatch.Status</span></p>
+
+                    <!-- Добавлены кнопки для массового управления этапами -->
+                    <div class="row">
+                        <div class="col-md-4">
+                            <form asp-action="StartAllStages" asp-controller="StageExecution" method="post">
+                                <input type="hidden" name="subBatchId" value="@ViewBag.SubBatch.Id" />
+                                <div class="input-group mb-3">
+                                    <input type="text" name="operator" class="form-control" placeholder="Имя оператора (необязательно)" />
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-play-circle"></i> Запустить все этапы
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-md-4">
+                            <form asp-action="CompleteAllStages" asp-controller="StageExecution" method="post">
+                                <input type="hidden" name="subBatchId" value="@ViewBag.SubBatch.Id" />
+                                <div class="input-group mb-3">
+                                    <input type="text" name="notes" class="form-control" placeholder="Комментарий (необязательно)" />
+                                    <button type="submit" class="btn btn-warning">
+                                        <i class="fas fa-check-circle"></i> Завершить все активные этапы
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="col-md-4">
+                            <a asp-controller="StageExecution" asp-action="BulkEditTime" asp-route-subBatchId="@ViewBag.SubBatch.Id"
+                               class="btn btn-info btn-block mb-3">
+                                <i class="fas fa-edit"></i> Массовое редактирование времени
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         }
         else
         {
             <h2>@ViewData["Title"]</h2>
+
+            <!-- Кнопка для запуска всех этапов, когда не выбрана подпартия -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <form asp-action="StartAllStages" asp-controller="StageExecution" method="post">
+                        <div class="input-group mb-3">
+                            <input type="text" name="operator" class="form-control" placeholder="Имя оператора (необязательно)" />
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-play-circle"></i> Запустить все этапы
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         }
 
         <table class="table table-striped">
@@ -87,6 +138,24 @@
                                         onclick="setStageId(@item.Id)">
                                     Запустить
                                 </button>
+                            }
+                            @if (item.Status == "InProgress" || item.Status == "Paused")
+                            {
+                                <a asp-controller="StageExecution" asp-action="Details" asp-route-id="@item.StageExecutions.FirstOrDefault()?.Id"
+                                   class="btn btn-sm btn-warning">
+                                    Управление
+                                </a>
+                            }
+                            @if (item.Status == "Completed")
+                            {
+                                var executionId = item.StageExecutions.FirstOrDefault()?.Id;
+                                if (executionId.HasValue)
+                                {
+                                    <a asp-controller="StageExecution" asp-action="EditTime" asp-route-id="@executionId"
+                                       class="btn btn-sm btn-secondary">
+                                        Ред. время
+                                    </a>
+                                }
                             }
                         </td>
                     </tr>

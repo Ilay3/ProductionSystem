@@ -203,10 +203,10 @@
             });
     }
 
-    function drawGanttChart(data) {
+        function drawGanttChart(data) {
         const ganttData = new google.visualization.DataTable();
 
-        // Правильная структура для диаграммы Ганта
+        // Структура для диаграммы Ганта
         ganttData.addColumn('string', 'Task ID');
         ganttData.addColumn('string', 'Task Name');
         ganttData.addColumn('string', 'Resource');
@@ -216,13 +216,19 @@
         ganttData.addColumn('number', 'Percent Complete');
         ganttData.addColumn('string', 'Dependencies');
 
-        // Добавляем строки
+        // Добавляем строки с корректными статусами
         data.forEach(item => {
             const startDate = parseDate(item.actualStart || item.start);
             const endDate = parseDate(item.actualEnd || item.end);
 
             // Duration в миллисекундах для Google Charts
             const duration = endDate.getTime() - startDate.getTime();
+
+            // Всегда устанавливаем percentComplete = 100 для завершенных задач
+            let percentComplete = item.percentComplete || 0;
+            if (item.status === 'Completed') {
+                percentComplete = 100;
+            }
 
             ganttData.addRow([
                 item.taskId,
@@ -231,12 +237,12 @@
                 startDate,
                 endDate,
                 duration,
-                item.percentComplete || 0,
+                percentComplete,
                 item.dependencies || null
             ]);
         });
 
-        // Опции диаграммы
+        // Опции диаграммы с улучшенным отображением статусов
         const options = {
             height: 700,
             width: '100%',
@@ -251,7 +257,7 @@
                     fontSize: 12,
                     color: '#333'
                 },
-                // Исправленная цветовая палитра по статусам
+                // Цветовая палитра по статусам
                 palette: [
                     {
                         "color": "#17a2b8", // Ready - голубой
@@ -365,7 +371,10 @@
         button.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Обработка...';
 
         fetch('/api/Automation/process', {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
         })
         .then(response => response.json())
         .then(data => {

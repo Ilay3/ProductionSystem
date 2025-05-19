@@ -7,8 +7,8 @@ namespace ProductionSystem.Data
     {
         private readonly string? _connectionString;
 
-        // Определяем временную зону UTC+4 (московское время)
-        private static readonly TimeZoneInfo LocalTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Russia Time Zone 3");
+        // Исправляем часовой пояс на UTC+4 для Самары/Саратова
+        private static readonly TimeZoneInfo LocalTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Russian Standard Time");
 
         public ProductionContext(DbContextOptions<ProductionContext> options) : base(options)
         {
@@ -271,7 +271,8 @@ namespace ProductionSystem.Data
         // Методы для получения текущего времени в UTC+4
         public static DateTime GetLocalNow()
         {
-            return DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified);
+            // Получаем текущее время по UTC+4 (Самара/Саратов)
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, LocalTimeZone);
         }
 
         public static DateTime ConvertToLocalTime(DateTime utcTime)

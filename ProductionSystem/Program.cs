@@ -58,6 +58,11 @@ app.UseRouting();
 app.UseSession();
 app.UseAuthorization();
 
+
+app.MapControllerRoute(
+    name: "api",
+    pattern: "api/{controller}/{action=Index}/{id?}");
+
 // Настройка маршрутизации
 app.MapControllerRoute(
     name: "default",

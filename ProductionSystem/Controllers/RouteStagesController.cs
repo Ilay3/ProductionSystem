@@ -175,5 +175,6 @@ namespace ProductionSystem.Controllers
             return Json(new { success = true, message = "Этап успешно запущен" });
         }
 
+
     }
 }

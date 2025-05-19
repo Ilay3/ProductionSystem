@@ -1,0 +1,91 @@
+﻿@model List<ProductionSystem.Models.StageExecution>
+
+@{
+    ViewData["Title"] = "Массовое редактирование времени";
+    var subBatchId = ViewBag.SubBatchId;
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h2>@ViewData["Title"]</h2>
+
+        @if (Model.Any())
+        {
+            <div class="card">
+                <div class="card-header">
+                    <h5>Завершенные этапы подпартии №@Model.First().RouteStage.SubBatch.BatchNumber</h5>
+                </div>
+                <div class="card-body">
+                    <form asp-action="SaveBulkTimes" method="post">
+                        <input type="hidden" name="subBatchId" value="@subBatchId" />
+
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Операция</th>
+                                    <th>Станок</th>
+                                    <th>Начало</th>
+                                    <th>Завершение</th>
+                                    <th>Плановое время (ч)</th>
+                                    <th>Фактическое время (ч)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (int i = 0; i < Model.Count; i++)
+                                {
+                                    var execution = Model[i];
+                                    var plannedTime = execution.RouteStage.PlannedTime;
+                                    var actualTime = execution.ActualTime ?? 0;
+                                    var exceededTime = actualTime > plannedTime;
+
+                                    <tr>
+                                        <td>
+                                            @execution.RouteStage.Name
+                                            <input type="hidden" name="Executions[@i].Id" value="@execution.Id" />
+                                        </td>
+                                        <td>@execution.Machine?.Name</td>
+                                        <td>@execution.StartedAt?.ToString("dd.MM.yyyy HH:mm")</td>
+                                        <td>@execution.CompletedAt?.ToString("dd.MM.yyyy HH:mm")</td>
+                                        <td>@plannedTime.ToString("F2")</td>
+                                        <td>
+                                            <div class="input-group">
+                                                <input type="number"
+                                                       name="Executions[@i].ActualTime"
+                                                       class="form-control @(exceededTime ? "border-danger" : "")"
+                                                       value="@actualTime.ToString("F2")"
+                                                       step="0.01"
+                                                       min="0.01" />
+                                                <span class="input-group-text">ч</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+
+                        <div class="form-group">
+                            <label for="bulkReason">Причина корректировки</label>
+                            <input type="text" name="bulkReason" class="form-control"
+                                   placeholder="Общая причина для всех корректировок" required />
+                        </div>
+
+                        <div class="form-group mt-3">
+                            <button type="submit" class="btn btn-primary">Сохранить все изменения</button>
+                            <a asp-controller="RouteStages" asp-action="Index" asp-route-subBatchId="@subBatchId"
+                               class="btn btn-secondary">Отмена</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info">
+                Нет завершенных этапов для редактирования
+            </div>
+
+            <a asp-controller="RouteStages" asp-action="Index" asp-route-subBatchId="@subBatchId"
+               class="btn btn-secondary">Вернуться к маршруту</a>
+        }
+    </div>
+</div>
