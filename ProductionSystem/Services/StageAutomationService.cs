@@ -108,6 +108,15 @@ namespace ProductionSystem.Services
                         continue;
                     }
 
+                    // ИСПРАВЛЕНИЕ: Проверяем завершенность предыдущего этапа
+                    if (!await IsPreviousStageCompleted(stage))
+                    {
+                        _logger.LogInformation($"Пропуск этапа {stage.Id}: предыдущий этап не завершен");
+                        // Добавляем этап в очередь вместо пропуска
+                        await AddStageToQueue(stage.Id);
+                        continue;
+                    }
+
                     await ProcessSingleStage(stage);
                     processedCount++;
 
@@ -140,13 +149,6 @@ namespace ProductionSystem.Services
             try
             {
                 _logger.LogInformation($"Обработка этапа {stage.Id} ({stage.Name})");
-
-                // Проверяем, что предыдущий этап завершен
-                if (!await IsPreviousStageCompleted(stage))
-                {
-                    _logger.LogInformation($"Пропуск этапа {stage.Id}: предыдущий этап не завершен");
-                    return;
-                }
 
                 // Получаем подходящие станки
                 var suitableMachines = await GetSuitableMachines(stage);
@@ -329,7 +331,7 @@ namespace ProductionSystem.Services
                     StageType = "Changeover",
                     Order = stage.Order - 1,
                     PlannedTime = changeoverTime,
-                    Quantity = 1,
+                    Quantity = 1, // Всегда 1 для переналадки
                     Status = "Ready", // Устанавливаем статус Ready вместо сразу InProgress
                     CreatedAt = ProductionContext.GetLocalNow()
                 };
@@ -389,20 +391,73 @@ namespace ProductionSystem.Services
             {
                 var stage = await _context.RouteStages
                     .Include(rs => rs.Operation)
+                    .Include(rs => rs.SubBatch) // ИСПРАВЛЕНИЕ: Добавляем связь с SubBatch
+                    .ThenInclude(sb => sb.ProductionOrder) // ИСПРАВЛЕНИЕ: Добавляем связь с ProductionOrder
                     .FirstOrDefaultAsync(rs => rs.Id == routeStageId);
 
-                if (stage == null || stage.Status != "Ready")
+                if (stage == null)
                 {
-                    _logger.LogWarning($"Не удалось добавить в очередь этап {routeStageId}: не найден или не готов");
+                    _logger.LogWarning($"Не удалось добавить в очередь этап {routeStageId}: не найден");
                     return false;
                 }
 
+                // ИСПРАВЛЕНИЕ: Проверяем, завершен ли предыдущий этап
+                bool canAddToQueue = true;
+
+                if (stage.Status != "Ready")
+                {
+                    _logger.LogWarning($"Не удалось добавить в очередь этап {routeStageId}: этап не в статусе Ready");
+                    canAddToQueue = false;
+                }
+
+                // Проверяем, завершены ли все предыдущие этапы маршрута
+                var previousStages = await _context.RouteStages
+                    .Where(rs => rs.SubBatchId == stage.SubBatchId && rs.Order < stage.Order)
+                    .ToListAsync();
+
+                var incompleteStages = previousStages.Where(rs => rs.Status != "Completed").ToList();
+
+                if (incompleteStages.Any())
+                {
+                    _logger.LogWarning($"Этап {routeStageId} имеет незавершенные предыдущие этапы. Проверка возможности добавления в очередь.");
+
+                    // Проверяем, можно ли добавить предыдущие этапы в очередь
+                    foreach (var prevStage in incompleteStages.OrderBy(s => s.Order))
+                    {
+                        if (prevStage.Status == "Ready")
+                        {
+                            // Добавляем предыдущий этап в очередь
+                            await AddStageToQueue(prevStage.Id);
+                        }
+                        else if (prevStage.Status != "Waiting" && prevStage.Status != "InProgress")
+                        {
+                            _logger.LogWarning($"Предыдущий этап {prevStage.Id} в статусе {prevStage.Status}, невозможно добавить текущий этап в очередь");
+                            canAddToQueue = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (!canAddToQueue)
+                {
+                    return false;
+                }
+
+                // Если всё в порядке, добавляем в очередь
                 stage.Status = "Waiting";
 
                 // Приоритезация (сохраняем текущее время для сортировки в очереди)
                 stage.PlannedStartDate = ProductionContext.GetLocalNow();
 
                 await _context.SaveChangesAsync();
+
+                // Добавляем лог
+                await AddExecutionLog(
+                    (await _context.StageExecutions.FirstOrDefaultAsync(se => se.RouteStageId == routeStageId))?.Id,
+                    "QueueAdded",
+                    "SYSTEM",
+                    "Этап добавлен в очередь"
+                );
 
                 _logger.LogInformation($"Этап {routeStageId} добавлен в очередь");
                 return true;
@@ -427,6 +482,14 @@ namespace ProductionSystem.Services
 
                 stage.Status = "Ready";
                 await _context.SaveChangesAsync();
+
+                // Добавляем лог
+                await AddExecutionLog(
+                    (await _context.StageExecutions.FirstOrDefaultAsync(se => se.RouteStageId == routeStageId))?.Id,
+                    "QueueRemoved",
+                    "SYSTEM",
+                    "Этап удален из очереди"
+                );
 
                 _logger.LogInformation($"Этап {routeStageId} удален из очереди");
                 return true;
@@ -490,6 +553,7 @@ namespace ProductionSystem.Services
                             elapsedHours -= execution.PauseTime.Value;
                         }
 
+                        // ИСПРАВЛЕНИЕ: Учитываем, что PlannedTime теперь учитывает количество деталей
                         var remainingTime = execution.RouteStage.PlannedTime - elapsedHours;
                         if (remainingTime <= 0)
                             remainingTime = 0.1m; // Минимум 6 минут если задача должна быть уже завершена
@@ -543,7 +607,6 @@ namespace ProductionSystem.Services
 
                 foreach (var machineTypeId in availableMachineTypes)
                 {
-
                     // Получаем все этапы в очереди для этого типа станка
                     var waitingStages = await _context.RouteStages
                         .Include(rs => rs.SubBatch)
@@ -556,8 +619,20 @@ namespace ProductionSystem.Services
                         .Take(5) // Берем только первые 5 для оптимизации
                         .ToListAsync();
 
-                    foreach (var stage in waitingStages)
+                    // ИСПРАВЛЕНИЕ: Группируем этапы по подпартии и обрабатываем в правильном порядке
+                    // Это обеспечит соблюдение последовательности операций
+                    var stagesBySubBatch = waitingStages
+                        .GroupBy(rs => rs.SubBatchId)
+                        .ToDictionary(g => g.Key, g => g.OrderBy(rs => rs.Order).ToList());
+
+                    foreach (var subBatchGroup in stagesBySubBatch)
                     {
+                        var stages = subBatchGroup.Value;
+
+                        // Берем только первый этап из каждой подпартии
+                        var stage = stages.FirstOrDefault();
+                        if (stage == null) continue;
+
                         // Проверяем, что предыдущий этап завершен
                         if (!await IsPreviousStageCompleted(stage))
                         {
@@ -596,8 +671,6 @@ namespace ProductionSystem.Services
                                 _logger.LogInformation("Достигнут лимит обработки этапов из очереди");
                                 return;
                             }
-
-                            break; // Переходим к следующему типу станка
                         }
                     }
                 }
@@ -686,11 +759,13 @@ namespace ProductionSystem.Services
             }
         }
 
-        private async Task AddExecutionLog(int executionId, string action, string operatorName, string notes)
+        private async Task AddExecutionLog(int? executionId, string action, string operatorName, string notes)
         {
+            if (!executionId.HasValue) return;
+
             var log = new ExecutionLog
             {
-                StageExecutionId = executionId,
+                StageExecutionId = executionId.Value,
                 Action = action,
                 Operator = operatorName,
                 Notes = notes,

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ProductionSystem.Data;
 using ProductionSystem.Models;
 using ProductionSystem.Services;
+using System.Text.Json;
 
 namespace ProductionSystem.Controllers
 {
@@ -10,11 +11,16 @@ namespace ProductionSystem.Controllers
     {
         private readonly ProductionContext _context;
         private readonly IStageAutomationService _stageAutomationService;
+        private readonly ILogger<GanttController> _logger;
 
-        public GanttController(ProductionContext context, IStageAutomationService stageAutomationService)
+        public GanttController(
+            ProductionContext context,
+            IStageAutomationService stageAutomationService,
+            ILogger<GanttController> logger)
         {
             _context = context;
             _stageAutomationService = stageAutomationService;
+            _logger = logger;
         }
 
         public async Task<IActionResult> Index(int? orderId, int? machineId, bool hideCompleted = false)
@@ -39,6 +45,8 @@ namespace ProductionSystem.Controllers
         {
             try
             {
+                _logger.LogInformation("Получение данных для диаграммы Ганта");
+
                 var query = _context.RouteStages
                     .Include(rs => rs.SubBatch)
                     .ThenInclude(sb => sb.ProductionOrder)
@@ -48,7 +56,7 @@ namespace ProductionSystem.Controllers
                     .Include(rs => rs.StageExecutions)
                     .AsQueryable();
 
-                // Фильтруем по статусу (исключая ожидающие задачи - Pending)
+                // Фильтруем по статусу
                 if (hideCompleted)
                 {
                     // Если скрываем завершенные - не показываем этапы со статусом Completed
@@ -71,10 +79,8 @@ namespace ProductionSystem.Controllers
                 }
 
                 // Добавляем фильтры по дате
-                // ИСПРАВЛЕНИЕ: Не преобразуем даты в UTC, используем их как есть (Kind=Unspecified)
                 if (startDate.HasValue)
                 {
-                    // Преобразуем дату, обеспечивая Kind = Unspecified
                     var startDateUnspecified = DateTime.SpecifyKind(startDate.Value, DateTimeKind.Unspecified);
                     query = query.Where(rs =>
                         rs.PlannedEndDate == null ||
@@ -83,7 +89,6 @@ namespace ProductionSystem.Controllers
 
                 if (endDate.HasValue)
                 {
-                    // Преобразуем дату, обеспечивая Kind = Unspecified
                     var endDateUnspecified = DateTime.SpecifyKind(endDate.Value, DateTimeKind.Unspecified);
                     query = query.Where(rs =>
                         rs.PlannedStartDate == null ||
@@ -101,12 +106,12 @@ namespace ProductionSystem.Controllers
 
                 foreach (var stage in stages)
                 {
-                    // Определяем даты начала и окончания
+                    // Определяем даты начала и окончания с учетом фактического выполнения
                     var startDate_calc = GetStageStartDate(stage, currentDateTime);
                     var endDate_calc = GetStageEndDate(stage, startDate_calc, currentDateTime);
 
                     // Определяем зависимости
-                    var dependencies = GetStageDependencies(stage);
+                    var dependencies = await GetStageDependencies(stage);
 
                     // Вычисляем процент выполнения
                     var percentComplete = GetStageProgress(stage, currentDateTime);
@@ -117,6 +122,26 @@ namespace ProductionSystem.Controllers
                     // Формируем цвет для типа этапа
                     string stageColor = GetStageColor(stage);
 
+                    // Определяем плановое время с учетом количества деталей
+                    decimal plannedTime = stage.PlannedTime;
+
+                    // Получаем фактическое время из выполнения
+                    decimal? actualTime = GetActualTime(stage);
+
+                    // Получаем оценку времени начала для этапов в очереди
+                    DateTime? estimatedStart = null;
+                    if (stage.Status == "Waiting")
+                    {
+                        try
+                        {
+                            estimatedStart = await _stageAutomationService.GetEstimatedStartTime(stage.Id);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, $"Не удалось получить оценку времени для этапа {stage.Id}");
+                        }
+                    }
+
                     ganttData.Add(new
                     {
                         taskId = $"task_{stage.Id}",
@@ -126,21 +151,23 @@ namespace ProductionSystem.Controllers
                         end = endDate_calc.ToString("yyyy-MM-ddTHH:mm:ss"),
                         actualStart = GetActualStartDate(stage)?.ToString("yyyy-MM-ddTHH:mm:ss"),
                         actualEnd = GetActualEndDate(stage)?.ToString("yyyy-MM-ddTHH:mm:ss"),
-                        duration = (long)(stage.PlannedTime * 24 * 60 * 60 * 1000), // В миллисекундах
+                        duration = (long)(plannedTime * 24 * 60 * 60 * 1000), // В миллисекундах
                         percentComplete = percentComplete,
                         dependencies = dependencies,
                         status = stage.Status,
                         stageType = stage.StageType,
                         subBatchId = stage.SubBatchId,
                         orderId = stage.SubBatch.ProductionOrderId,
-                        stageId = stage.Id, 
-                        plannedTime = stage.PlannedTime,
-                        actualTime = GetActualTime(stage),
+                        stageId = stage.Id,
+                        plannedTime = plannedTime,
+                        actualTime = actualTime,
                         machine = stage.Machine != null ? new { stage.Machine.Id, stage.Machine.Name } : null,
                         canReleaseMachine = CanReleaseMachine(stage),
                         canAddToQueue = stage.Status == "Ready",
                         canRemoveFromQueue = stage.Status == "Waiting",
-                        color = stageColor
+                        estimatedStart = estimatedStart,
+                        color = stageColor,
+                        quantity = stage.Quantity,
                     });
                 }
 
@@ -148,8 +175,7 @@ namespace ProductionSystem.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Ошибка в GetGanttData: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                _logger.LogError(ex, "Ошибка в GetGanttData");
                 return StatusCode(500, new { error = "Ошибка загрузки данных диаграммы Ганта", details = ex.Message });
             }
         }
@@ -171,6 +197,130 @@ namespace ProductionSystem.Controllers
             };
         }
 
+        // Метод для получения истории этапа
+        [HttpGet]
+        public async Task<IActionResult> GetStageHistory(int stageId)
+        {
+            try
+            {
+                // Получаем все логи выполнения этапа
+                var executionLogs = await _context.ExecutionLogs
+                    .Include(log => log.StageExecution)
+                    .Where(log => log.StageExecution.RouteStageId == stageId)
+                    .OrderByDescending(log => log.Timestamp)
+                    .ToListAsync();
+
+                // ИСПРАВЛЕНО: переименовали свойство operator на operatorName
+                var historyItems = executionLogs.Select(log => new
+                {
+                    id = log.Id,
+                    timestamp = log.Timestamp,
+                    action = log.Action,
+                    operatorName = log.Operator, // Переименовано с operator на operatorName
+                    notes = log.Notes
+                }).ToList();
+
+                return Json(new { success = true, history = historyItems });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Ошибка получения истории для этапа {stageId}");
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+
+        // Получение всех этапов в очереди
+        [HttpGet]
+        public async Task<IActionResult> GetWaitingStages(int? machineId = null)
+        {
+            try
+            {
+                IQueryable<RouteStage> query = _context.RouteStages
+                    .Include(rs => rs.SubBatch)
+                    .ThenInclude(sb => sb.ProductionOrder)
+                    .ThenInclude(po => po.Detail)
+                    .Include(rs => rs.Operation)
+                    .Include(rs => rs.Machine)
+                    .Where(rs => rs.Status == "Waiting");
+
+                if (machineId.HasValue)
+                {
+                    var machine = await _context.Machines
+                        .Include(m => m.MachineType)
+                        .FirstOrDefaultAsync(m => m.Id == machineId);
+
+                    if (machine != null)
+                    {
+                        // Фильтруем по типу станка
+                        query = query.Where(rs => rs.Operation != null && rs.Operation.MachineTypeId == machine.MachineTypeId);
+                    }
+                }
+
+                var stages = await query.OrderBy(rs => rs.PlannedStartDate).ToListAsync();
+
+                var result = stages.Select(stage => new
+                {
+                    stageId = stage.Id,
+                    name = stage.Name,
+                    detailName = stage.SubBatch.ProductionOrder.Detail.Name,
+                    orderNumber = stage.SubBatch.ProductionOrder.Number,
+                    stageType = stage.StageType,
+                    targetMachine = stage.Machine?.Name,
+                    estimatedStart = _stageAutomationService.GetEstimatedStartTime(stage.Id).Result
+                }).ToList();
+
+                return Json(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка получения списка этапов в очереди");
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        // Получение доступных станков для переназначения
+        [HttpGet]
+        public async Task<IActionResult> GetAvailableMachines(int stageId)
+        {
+            try
+            {
+                var stage = await _context.RouteStages
+                    .Include(rs => rs.Operation)
+                    .FirstOrDefaultAsync(rs => rs.Id == stageId);
+
+                if (stage == null)
+                    return Json(new { success = false, message = "Этап не найден" });
+
+                var machineTypeId = stage.Operation?.MachineTypeId;
+
+                if (machineTypeId == null)
+                    return Json(new { success = false, message = "Тип станка не определен" });
+
+                // Получаем все станки данного типа
+                var machines = await _context.Machines
+                    .Where(m => m.MachineTypeId == machineTypeId)
+                    .Select(m => new
+                    {
+                        id = m.Id,
+                        name = m.Name,
+                        // Станок занят, если на нем есть активные выполнения
+                        isBusy = _context.StageExecutions.Any(
+                            se => se.MachineId == m.Id && se.Status == "Started")
+                    })
+                    .OrderBy(m => m.isBusy)
+                    .ThenBy(m => m.name)
+                    .ToListAsync();
+
+                return Json(machines);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Ошибка получения доступных станков для этапа {stageId}");
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
         [HttpPost]
         public async Task<IActionResult> ReleaseMachine(int machineId, int urgentStageId, string reason)
         {
@@ -189,6 +339,7 @@ namespace ProductionSystem.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, $"Ошибка освобождения станка {machineId}");
                 return Json(new { success = false, message = ex.Message });
             }
         }
@@ -211,7 +362,7 @@ namespace ProductionSystem.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Ошибка при добавлении этапа {id} в очередь");
+                _logger.LogError(ex, $"Ошибка при добавлении этапа {id} в очередь");
                 return Json(new { success = false, message = $"Ошибка: {ex.Message}" });
             }
         }
@@ -235,7 +386,7 @@ namespace ProductionSystem.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Ошибка при удалении этапа {id} из очереди");
+                _logger.LogError(ex, $"Ошибка при удалении этапа {id} из очереди");
                 return Json(new { success = false, message = $"Ошибка: {ex.Message}" });
             }
         }
@@ -266,7 +417,7 @@ namespace ProductionSystem.Controllers
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Ошибка при получении прогнозируемого времени для этапа {id}");
+                        _logger.LogWarning(ex, $"Ошибка при получении прогнозируемого времени для этапа {id}");
                     }
                 }
 
@@ -285,14 +436,15 @@ namespace ProductionSystem.Controllers
                     canReleaseMachine = stage.MachineId.HasValue &&
                                       stage.StageExecutions.Any(se => se.Status == "Started"),
                     canAddToQueue = stage.Status == "Ready",
-                    canRemoveFromQueue = stage.Status == "Waiting"
+                    canRemoveFromQueue = stage.Status == "Waiting",
+                    quantity = stage.Quantity
                 };
 
                 return Json(stageInfo);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Ошибка при получении информации о этапе {id}");
+                _logger.LogError(ex, $"Ошибка при получении информации о этапе {id}");
                 return Json(new { success = false, message = $"Ошибка: {ex.Message}" });
             }
         }
@@ -332,7 +484,7 @@ namespace ProductionSystem.Controllers
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Ошибка при получении прогнозируемого времени для этапа {stage.Id}");
+                        _logger.LogWarning(ex, $"Ошибка при получении прогнозируемого времени для этапа {stage.Id}");
                     }
 
                     queueInfo.Add(new
@@ -342,7 +494,8 @@ namespace ProductionSystem.Controllers
                         detailName = stage.SubBatch.ProductionOrder.Detail.Name,
                         orderNumber = stage.SubBatch.ProductionOrder.Number,
                         estimatedStart = estimatedStart,
-                        stageType = stage.StageType
+                        stageType = stage.StageType,
+                        quantity = stage.Quantity
                     });
                 }
 
@@ -350,7 +503,7 @@ namespace ProductionSystem.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Ошибка при получении очереди для станка {id}");
+                _logger.LogError(ex, $"Ошибка при получении очереди для станка {id}");
                 return Json(new { success = false, message = $"Ошибка: {ex.Message}" });
             }
         }
@@ -484,12 +637,12 @@ namespace ProductionSystem.Controllers
                    stage.StageExecutions.Any(se => se.Status == "Started");
         }
 
-        private string GetStageDependencies(RouteStage stage)
+        private async Task<string> GetStageDependencies(RouteStage stage)
         {
-            var previousStage = _context.RouteStages
+            var previousStage = await _context.RouteStages
                 .Where(rs => rs.SubBatchId == stage.SubBatchId && rs.Order < stage.Order)
                 .OrderByDescending(rs => rs.Order)
-                .FirstOrDefault();
+                .FirstOrDefaultAsync();
 
             return previousStage != null ? $"task_{previousStage.Id}" : "";
         }
@@ -571,8 +724,7 @@ namespace ProductionSystem.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Ошибка в GetMachineUtilization: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                _logger.LogError(ex, $"Ошибка в GetMachineUtilization");
                 return StatusCode(500, new { error = "Ошибка загрузки данных о загрузке станков", details = ex.Message });
             }
         }
