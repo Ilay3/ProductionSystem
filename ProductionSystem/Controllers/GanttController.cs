@@ -644,18 +644,17 @@ namespace ProductionSystem.Controllers
 
         private async Task<string> GetStageDependencies(RouteStage stage)
         {
-            // Если это не первый этап в подпартии, связываем только с непосредственно предыдущим
-            // этапом той же подпартии и того же типа операции
+            // Находим только непосредственно предыдущий этап той же подпартии
             var previousStage = await _context.RouteStages
                 .Where(rs => rs.SubBatchId == stage.SubBatchId &&
-                           rs.Order < stage.Order &&
-                           rs.StageType == stage.StageType)
+                           rs.Order < stage.Order)
                 .OrderByDescending(rs => rs.Order)
                 .FirstOrDefaultAsync();
 
-            // Если предыдущий этап того же типа не найден, не создаем зависимость
+            // Если предыдущий этап найден, создаем зависимость
             return previousStage != null ? $"task_{previousStage.Id}" : "";
         }
+
 
         // Вспомогательные методы 
 

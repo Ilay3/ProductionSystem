@@ -562,17 +562,22 @@
                 }
 
                 data.sort((a, b) => {
-                // Сначала по машине
-                if (a.resource !== b.resource) {
-                    return a.resource.localeCompare(b.resource);
-                }
-                // Потом по типу (переналадки идут перед операциями)
-                if (a.stageType !== b.stageType) {
-                    return a.stageType === "Changeover" ? -1 : 1;
-                }
-                // Наконец, по времени начала
-                return new Date(a.start) - new Date(b.start);
-                 });
+                    // Сначала группируем по подпартии (SubBatchId)
+                    if (a.subBatchId !== b.subBatchId) {
+                        return a.subBatchId - b.subBatchId;
+                    }
+                    // Потом по порядку в маршруте
+                    if (a.order !== b.order) {
+                        return a.order - b.order;
+                    }
+                    // Затем по машине
+                    if (a.resource !== b.resource) {
+                        return a.resource.localeCompare(b.resource);
+                    }
+                    // Наконец, по времени начала
+                    return new Date(a.start) - new Date(b.start);
+                });
+
 
 
                 const ganttData = new google.visualization.DataTable();
@@ -666,11 +671,14 @@
                         innerGridHorizontalStroke: '#eeeeee',
                         innerGridVerticalStroke: '#eeeeee',
                         arrow: {
-                            angle: 20,
-                            width: 1.5,
-                            color: 'rgba(85, 85, 85, 0.7)',
-                            radius: 5
+                            angle: 30,           // Увеличено для лучшей видимости
+                            width: 2,            // Увеличена толщина линии
+                            color: '#555',       // Более контрастный цвет
+                            radius: 8,           // Увеличен радиус закругления
+                            spaceAfter: 3        // Добавлен отступ от задачи
                         },
+                        percentEnabled: true,    // Включаем отображение процента выполнения
+                        shadowEnabled: true,     // Добавляем тени для лучшей визуализации
                         labelStyle: {
                             fontName: 'Arial',
                             fontSize: 13,
@@ -680,10 +688,12 @@
                     hAxis: {
                         format: 'dd.MM HH:mm',
                         minValue: minDate,
-                        maxValue: maxDate
+                        maxValue: maxDate,
+                        slantedText: true       // Наклонный текст для лучшей читаемости дат
                     },
                     tooltip: { isHtml: true }
                 };
+
 
 
 
