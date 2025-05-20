@@ -63,17 +63,7 @@
             animation: fadeInOut 0.3s ease-in-out;
         }
 
-        @@keyframes fadeInOut {
-            0% {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-
-            100% {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
+        
         /* Стили для drag&drop */
         .draggable-task {
             cursor: grab;
@@ -93,13 +83,11 @@
             }
         /* Адаптивность */
         @@media (max-width: 768px) {
-            .card-body .row > div
-
-        {
-            margin-bottom: 10px;
+            .card-body .row > div {
+                margin-bottom: 10px;
+            }
         }
 
-        }
     </style>
 }
 
@@ -573,6 +561,20 @@
                     return;
                 }
 
+                data.sort((a, b) => {
+                // Сначала по машине
+                if (a.resource !== b.resource) {
+                    return a.resource.localeCompare(b.resource);
+                }
+                // Потом по типу (переналадки идут перед операциями)
+                if (a.stageType !== b.stageType) {
+                    return a.stageType === "Changeover" ? -1 : 1;
+                }
+                // Наконец, по времени начала
+                return new Date(a.start) - new Date(b.start);
+                 });
+
+
                 const ganttData = new google.visualization.DataTable();
 
                 // Структура для диаграммы Ганта
@@ -657,15 +659,21 @@
                     height: 700,
                     width: '100%',
                     gantt: {
-                        trackHeight: 45, // ИСПРАВЛЕНО: Увеличено для лучшей видимости
-                        barHeight: 35,   // ИСПРАВЛЕНО: Увеличено для лучшей видимости
+                        trackHeight: 45,
+                        barHeight: 35,
                         criticalPathEnabled: false,
                         defaultStartDate: minDate,
                         innerGridHorizontalStroke: '#eeeeee',
                         innerGridVerticalStroke: '#eeeeee',
+                        arrow: {
+                            angle: 20,
+                            width: 1.5,
+                            color: 'rgba(85, 85, 85, 0.7)',
+                            radius: 5
+                        },
                         labelStyle: {
                             fontName: 'Arial',
-                            fontSize: 13,  // ИСПРАВЛЕНО: Увеличен размер шрифта
+                            fontSize: 13,
                             color: '#333'
                         }
                     },
@@ -676,6 +684,8 @@
                     },
                     tooltip: { isHtml: true }
                 };
+
+
 
                 chartContainer = document.getElementById('gantt_chart');
                 ganttChart = new google.visualization.Gantt(chartContainer);
@@ -736,41 +746,42 @@
                 });
             }
 
-            // Обработка окончания перетаскивания
-            function handleDragEnd(e) {
-                if (!isDragging) return;
+                    // Обработка окончания перетаскивания
+        function handleDragEnd(e) {
+            if (!isDragging) return;
 
-                const dropElement = getDropTarget(e);
-                if (dropElement && draggedStageId) {
-                    // Получаем ID машины из элемента
-                    const machineName = dropElement.getAttribute('data-machine-name');
-                    if (machineName) {
-                        // Находим ID машины по имени
-                        const machine = machinesList.find(m => m.Name === machineName);
-                        if (machine) {
-                            // Переназначаем станок
-                            reassignStage(draggedStageId, machine.Id);
-                        }
+            const dropElement = getDropTarget(e);
+            if (dropElement && draggedStageId) {
+                // Получаем ID машины из элемента
+                const machineName = dropElement.getAttribute('data-machine-name');
+                if (machineName) {
+                    // Находим ID машины по имени
+                    const machine = machinesList.find(m => m.name === machineName);
+                    if (machine) {
+                        reassignStage(draggedStageId, machine.id); // используйте id с маленькой буквы
                     }
+
+
                 }
-
-                // Сбрасываем состояние перетаскивания
-                isDragging = false;
-                const draggedElement = document.querySelector('rect[style*="opacity: 0.5"]');
-                if (draggedElement) {
-                    draggedElement.style.opacity = draggedElement.getAttribute('data-original-opacity') || '1';
-                    draggedElement.style.cursor = '';
-                }
-
-                // Удаляем временные обработчики
-                document.removeEventListener('mouseup', handleDragEnd);
-                document.removeEventListener('mousemove', handleDragMove);
-
-                // Сбрасываем все подсветки зон сброса
-                document.querySelectorAll('.drop-highlight').forEach(el => {
-                    el.classList.remove('drop-highlight');
-                });
             }
+
+            // Сбрасываем состояние перетаскивания
+            isDragging = false;
+            const draggedElement = document.querySelector('rect[style*="opacity: 0.5"]');
+            if (draggedElement) {
+                draggedElement.style.opacity = draggedElement.getAttribute('data-original-opacity') || '1';
+                draggedElement.style.cursor = '';
+            }
+
+            // Удаляем временные обработчики
+            document.removeEventListener('mouseup', handleDragEnd);
+            document.removeEventListener('mousemove', handleDragMove);
+
+            // Сбрасываем все подсветки зон сброса
+            document.querySelectorAll('.drop-highlight').forEach(el => {
+                el.classList.remove('drop-highlight');
+            });
+        }
 
             // Обработка движения при перетаскивании
             function handleDragMove(e) {
@@ -857,36 +868,47 @@
                 return tooltipContent;
             }
 
-            // Обработка движения мыши для продвинутых тултипов
-            function handleMouseMove(event) {
-                // Находим задачу под курсором
-                const chartElements = chartContainer.querySelectorAll('rect[fill]:not([fill="none"])');
-                let isOverTask = false;
-                let taskInfo = null;
+                    // Обработка движения мыши для продвинутых тултипов
+        function handleMouseMove(event) {
+            // Находим задачу под курсором
+            const chartElements = chartContainer.querySelectorAll('rect[fill]:not([fill="none"])');
+            let isOverTask = false;
+            let taskInfo = null;
 
-                chartElements.forEach(element => {
-                    const rect = element.getBoundingClientRect();
-                    if (event.clientX >= rect.left && event.clientX <= rect.right &&
-                        event.clientY >= rect.top && event.clientY <= rect.bottom) {
+            chartElements.forEach(element => {
+                const rect = element.getBoundingClientRect();
+                if (event.clientX >= rect.left && event.clientX <= rect.right &&
+                    event.clientY >= rect.top && event.clientY <= rect.bottom) {
 
-                        isOverTask = true;
+                    isOverTask = true;
 
-                        // Пытаемся определить, к какой задаче относится этот элемент
-                        const taskId = findTaskIdByElement(element);
-                        if (taskId) {
-                            taskInfo = ganttDataGlobal.find(task => task.taskId === taskId);
-                        }
+                    // Пытаемся определить, к какой задаче относится этот элемент
+                    const taskId = findTaskIdByElement(element);
+                    if (taskId) {
+                        taskInfo = ganttDataGlobal.find(task => task.taskId === taskId);
                     }
-                });
-
-                if (isOverTask && taskInfo) {
-                    // Отображаем стандартный тултип
-                    tooltipVisible = true;
-                } else {
-                    // Скрываем тултип
-                    tooltipVisible = false;
                 }
+            });
+
+                    if (isOverTask && taskInfo) {
+            // Отображаем стандартный тултип
+            tooltipVisible = true;
+            const tooltip = document.getElementById('gantt-tooltip');
+            if (tooltip) {
+                tooltip.style.display = 'block';
+                tooltip.style.left = `${event.pageX + 10}px`;
+                tooltip.style.top = `${event.pageY + 10}px`;
+                tooltip.innerHTML = createTooltipHtml(taskInfo);
             }
+        } else {
+            // Скрываем тултип
+            tooltipVisible = false;
+            const tooltip = document.getElementById('gantt-tooltip');
+            if (tooltip) {
+                tooltip.style.display = 'none';
+            }
+        }
+        }
 
             // Обработчик контекстного меню
             function handleContextMenu(event) {
@@ -1724,13 +1746,22 @@
 
             // Переназначение станка для этапа
             function reassignStage(stageId, machineId) {
+                    if (!stageId || !machineId) {
+            console.error("Invalid parameters:", { stageId, machineId });
+            showToast('Ошибка: недостаточно данных для переназначения', 'error');
+            return;
+        }
+
+            const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
                 fetch('/RouteStages/AssignMachine', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
+                        'RequestVerificationToken': token
                     },
-                    body: `id=${stageId}&machineId=${machineId}`
+                    body: `id=${stageId}&machineId=${machineId}&__RequestVerificationToken=${token}`
                 })
+
                 .then(response => {
                     if (response.redirected) {
                         // Успешное перенаправление - операция выполнена
@@ -1909,6 +1940,6 @@
             window.hideContextMenu = hideContextMenu;
             window.handleMouseMove = handleMouseMove;
             window.findTaskIdByElement = findTaskIdByElement;
-        });
+        
     </script>
 }

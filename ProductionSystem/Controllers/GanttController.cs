@@ -111,7 +111,12 @@ namespace ProductionSystem.Controllers
                     var endDate_calc = GetStageEndDate(stage, startDate_calc, currentDateTime);
 
                     // Определяем зависимости
-                    var dependencies = await GetStageDependencies(stage);
+                    var dependencies = "";
+                    if (stage.Machine != null)
+                    {
+                        dependencies = await GetStageDependencies(stage);
+                    }
+
 
                     // Вычисляем процент выполнения
                     var percentComplete = GetStageProgress(stage, currentDateTime);
@@ -639,14 +644,20 @@ namespace ProductionSystem.Controllers
 
         private async Task<string> GetStageDependencies(RouteStage stage)
         {
+            // Если это не первый этап в подпартии, связываем только с непосредственно предыдущим
+            // этапом той же подпартии и того же типа операции
             var previousStage = await _context.RouteStages
-                .Where(rs => rs.SubBatchId == stage.SubBatchId && rs.Order < stage.Order)
+                .Where(rs => rs.SubBatchId == stage.SubBatchId &&
+                           rs.Order < stage.Order &&
+                           rs.StageType == stage.StageType)
                 .OrderByDescending(rs => rs.Order)
                 .FirstOrDefaultAsync();
 
+            // Если предыдущий этап того же типа не найден, не создаем зависимость
             return previousStage != null ? $"task_{previousStage.Id}" : "";
         }
-        // Вспомогательные методы - конец
+
+        // Вспомогательные методы 
 
         [HttpPost]
         public async Task<IActionResult> UpdateStageDates(int stageId, DateTime startDate, DateTime endDate)

@@ -224,59 +224,62 @@ namespace ProductionSystem.Services
 
         private async Task AssignMachineAndStartStage(RouteStage stage, Machine machine)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            // Используем стратегию выполнения EF Core
+            await _context.Database.CreateExecutionStrategy().ExecuteAsync(async () => {
+                using var transaction = await _context.Database.BeginTransactionAsync();
 
-            try
-            {
-                // Проверяем, не занят ли станок другой операцией
-                var isStageRunningOnMachine = await _context.StageExecutions
-                    .AnyAsync(se => se.MachineId == machine.Id && se.Status == "Started");
-
-                if (isStageRunningOnMachine)
+                try
                 {
-                    _logger.LogWarning($"Невозможно запустить этап {stage.Id} - станок {machine.Id} занят");
-                    await transaction.RollbackAsync();
-                    return;
-                }
+                    // Проверяем, не занят ли станок другой операцией
+                    var isStageRunningOnMachine = await _context.StageExecutions
+                        .AnyAsync(se => se.MachineId == machine.Id && se.Status == "Started");
 
-                // Проверяем, нужна ли переналадка
-                var needChangeover = await CheckNeedChangeover(stage, machine);
-
-                if (needChangeover)
-                {
-                    // Создаем этап переналадки
-                    var changeoverStage = await CreateChangeoverStage(stage, machine);
-                    if (changeoverStage != null)
+                    if (isStageRunningOnMachine)
                     {
-                        // Запускаем переналадку
-                        await StartStageExecution(changeoverStage, machine.Id, "AUTO");
-
-                        // Не запускаем основной этап сразу - он запустится после выполнения переналадки
-                        _logger.LogInformation($"Этап {stage.Id} ожидает завершения переналадки {changeoverStage.Id}");
-
-                        await transaction.CommitAsync();
+                        _logger.LogWarning($"Невозможно запустить этап {stage.Id} - станок {machine.Id} занят");
+                        await transaction.RollbackAsync();
                         return;
                     }
+
+                    // Проверяем, нужна ли переналадка
+                    var needChangeover = await CheckNeedChangeover(stage, machine);
+
+                    if (needChangeover)
+                    {
+                        // Создаем этап переналадки
+                        var changeoverStage = await CreateChangeoverStage(stage, machine);
+                        if (changeoverStage != null)
+                        {
+                            // Запускаем переналадку
+                            await StartStageExecution(changeoverStage, machine.Id, "AUTO");
+
+                            // Не запускаем основной этап сразу - он запустится после выполнения переналадки
+                            _logger.LogInformation($"Этап {stage.Id} ожидает завершения переналадки {changeoverStage.Id}");
+
+                            await transaction.CommitAsync();
+                            return;
+                        }
+                    }
+
+                    // Назначаем станок
+                    stage.MachineId = machine.Id;
+                    stage.Status = "InProgress";
+                    await _context.SaveChangesAsync();
+
+                    // Создаем и запускаем выполнение этапа
+                    await StartStageExecution(stage, machine.Id, "AUTO");
+
+                    await transaction.CommitAsync();
+
+                    _logger.LogInformation($"Этап {stage.Id} автоматически запущен на станке {machine.Name}");
                 }
-
-                // Назначаем станок
-                stage.MachineId = machine.Id;
-                stage.Status = "InProgress";
-                await _context.SaveChangesAsync();
-
-                // Создаем и запускаем выполнение этапа
-                await StartStageExecution(stage, machine.Id, "AUTO");
-
-                await transaction.CommitAsync();
-
-                _logger.LogInformation($"Этап {stage.Id} автоматически запущен на станке {machine.Name}");
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync();
-                _logger.LogError(ex, $"Ошибка запуска этапа {stage.Id} на станке {machine.Name}");
-                throw;
-            }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    _logger.LogError(ex, $"Ошибка запуска этапа {stage.Id} на станке {machine.Name}");
+                    throw;
+                }
+            });
         }
 
         private async Task<bool> CheckNeedChangeover(RouteStage stage, Machine machine)
@@ -685,78 +688,79 @@ namespace ProductionSystem.Services
 
         public async Task<bool> ReleaseMachine(int machineId, int urgentStageId, string reason)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
-
-            try
+            return await _context.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
             {
-                // Находим текущее выполнение на станке
-                var currentExecution = await _context.StageExecutions
-                    .Include(se => se.RouteStage)
-                    .Include(se => se.Machine)
-                    .ThenInclude(m => m.MachineType)
-                    .FirstOrDefaultAsync(se => se.MachineId == machineId &&
-                                            (se.Status == "Started"));
+                using var transaction = await _context.Database.BeginTransactionAsync();
 
-                if (currentExecution == null)
+                try
                 {
-                    _logger.LogWarning($"Не удалось освободить станок {machineId}: не найдено активных выполнений");
+                    // Находим текущее выполнение на станке
+                    var currentExecution = await _context.StageExecutions
+                        .Include(se => se.RouteStage)
+                        .Include(se => se.Machine)
+                        .ThenInclude(m => m.MachineType)
+                        .FirstOrDefaultAsync(se => se.MachineId == machineId &&
+                                                (se.Status == "Started"));
+
+                    if (currentExecution == null)
+                    {
+                        _logger.LogWarning($"Не удалось освободить станок {machineId}: не найдено активных выполнений");
+                        return false;
+                    }
+
+                    // Ставим текущее выполнение на паузу
+                    currentExecution.Status = "Paused";
+                    currentExecution.PausedAt = ProductionContext.GetLocalNow();
+                    currentExecution.RouteStage.Status = "Paused";
+
+                    // Добавляем лог
+                    await AddExecutionLog(currentExecution.Id, "Paused", "AUTO", $"Станок освобожден для срочной задачи: {reason}");
+                    await _context.SaveChangesAsync();
+
+                    _logger.LogInformation($"Текущее выполнение {currentExecution.Id} поставлено на паузу");
+
+                    // Запускаем срочный этап
+                    if (urgentStageId > 0)
+                    {
+                        var urgentStage = await _context.RouteStages
+                            .Include(rs => rs.SubBatch)
+                            .ThenInclude(sb => sb.ProductionOrder)
+                            .FirstOrDefaultAsync(rs => rs.Id == urgentStageId);
+
+                        if (urgentStage != null)
+                        {
+                            // Проверяем, что этап в статусе Ready
+                            if (urgentStage.Status != "Ready")
+                            {
+                                urgentStage.Status = "Ready";
+                                await _context.SaveChangesAsync();
+                            }
+
+                            // Назначаем станок
+                            urgentStage.MachineId = machineId;
+                            await _context.SaveChangesAsync();
+
+                            // Запускаем этап
+                            await StartStageExecution(urgentStage, machineId, "URGENT");
+
+                            _logger.LogInformation($"Срочный этап {urgentStageId} запущен на освобожденном станке {machineId}");
+                        }
+                        else
+                        {
+                            _logger.LogWarning($"Срочный этап {urgentStageId} не найден");
+                        }
+                    }
+
+                    await transaction.CommitAsync();
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    _logger.LogError(ex, $"Ошибка освобождения станка {machineId}");
                     return false;
                 }
-
-                // Ставим текущее выполнение на паузу
-                currentExecution.Status = "Paused";
-                currentExecution.PausedAt = ProductionContext.GetLocalNow();
-                currentExecution.RouteStage.Status = "Paused";
-
-                // Добавляем лог
-                await AddExecutionLog(currentExecution.Id, "Paused", "AUTO", $"Станок освобожден для срочной задачи: {reason}");
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation($"Текущее выполнение {currentExecution.Id} поставлено на паузу");
-
-                // Запускаем срочный этап
-                if (urgentStageId > 0)
-                {
-                    var urgentStage = await _context.RouteStages
-                        .Include(rs => rs.SubBatch)
-                        .ThenInclude(sb => sb.ProductionOrder)
-                        .FirstOrDefaultAsync(rs => rs.Id == urgentStageId);
-
-                    if (urgentStage != null)
-                    {
-                        // Проверяем, что этап в статусе Ready
-                        if (urgentStage.Status != "Ready")
-                        {
-                            urgentStage.Status = "Ready";
-                            await _context.SaveChangesAsync();
-                        }
-
-                        // Назначаем станок
-                        urgentStage.MachineId = machineId;
-                        await _context.SaveChangesAsync();
-
-                        // Запускаем этап
-                        await StartStageExecution(urgentStage, machineId, "URGENT");
-
-                        _logger.LogInformation($"Срочный этап {urgentStageId} запущен на освобожденном станке {machineId}");
-                    }
-                    else
-                    {
-                        _logger.LogWarning($"Срочный этап {urgentStageId} не найден");
-                    }
-                }
-
-                await transaction.CommitAsync();
-
-                _logger.LogInformation($"Станок {machineId} освобожден для срочного этапа {urgentStageId}. Причина: {reason}");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync();
-                _logger.LogError(ex, $"Ошибка освобождения станка {machineId}");
-                return false;
-            }
+            });
         }
 
         private async Task AddExecutionLog(int? executionId, string action, string operatorName, string notes)
